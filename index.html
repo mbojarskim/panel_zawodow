@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Sterowania - Zawody Lekkoatletyczne</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; height: 100vh; overflow: hidden; }
+        .dashboard { display: flex; height: 100vh; }
+        .left-panel { width: 280px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 20px 0; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.1); overflow-y: auto; }
+        .logo { padding: 0 20px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px; }
+        .logo h2 { font-size: 1.3rem; margin-bottom: 5px; }
+        .logo p { font-size: 0.8rem; color: #888; }
+        .nav-btn { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin: 2px 12px; background: transparent; border: none; color: #ccc; font-size: 0.9rem; cursor: pointer; border-radius: 10px; transition: all 0.3s ease; text-align: left; width: calc(100% - 24px); }
+        .nav-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-btn.active { background: #0f3460; color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .nav-btn .icon { font-size: 1.2rem; width: 28px; }
+        .middle-panel { flex: 1; padding: 20px; overflow-y: auto; background: #f8f9fa; }
+        .right-panel { width: 320px; background: #fff; border-left: 1px solid #ddd; display: flex; flex-direction: column; box-shadow: -2px 0 10px rgba(0,0,0,0.05); }
+        .errors-header { padding: 15px 20px; background: #dc3545; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .clear-errors { background: rgba(255,255,255,0.2); border: none; color: white; padding: 4px 10px; border-radius: 5px; cursor: pointer; }
+        .errors-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .error-item { background: #f8d7da; color: #721c24; padding: 10px; margin-bottom: 8px; border-radius: 6px; font-size: 0.85rem; border-left: 3px solid #dc3545; word-break: break-word; }
+        .success-item { background: #d4edda; color: #155724; border-left-color: #28a745; }
+        .warning-item { background: #fff3cd; color: #856404; border-left-color: #ffc107; }
+        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h3 { margin-bottom: 15px; color: #1a1a2e; border-left: 4px solid #0f3460; padding-left: 12px; }
+        .file-upload { border: 2px dashed #ccc; padding: 30px; text-align: center; border-radius: 10px; cursor: pointer; transition: all 0.3s; }
+        .file-upload:hover { border-color: #0f3460; background: #f0f8ff; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #0a0f2c; color: white; position: sticky; top: 0; }
+        .table-container { overflow-x: auto; max-height: 500px; }
+        button { background: #0f3460; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin: 5px; }
+        button:hover { background: #1a4a7a; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        button.success { background: #28a745; }
+        button.success:hover { background: #218838; }
+        button.info { background: #17a2b8; }
+        input, textarea, select { width: 100%; padding: 8px; margin: 5px 0 10px 0; border: 1px solid #ddd; border-radius: 4px; }
+        .checkbox-label { display: flex; align-items: center; gap: 10px; margin: 15px 0; cursor: pointer; }
+        .checkbox-label input { width: auto; margin: 0; }
+        .loading { text-align: center; padding: 20px; color: #666; }
+        .info-note { background: #e7f3ff; border-left: 4px solid #0f3460; padding: 10px; margin-top: 10px; font-size: 0.85rem; color: #333; }
+        .mapping-row, .category-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .mapping-row input, .category-row input { flex: 1; margin: 0; }
+        .mapping-row button, .category-row button { margin: 0; padding: 8px 12px; }
+        .mapping-header, .category-header { display: flex; gap: 10px; margin-bottom: 15px; font-weight: bold; color: #555; font-size: 0.85rem; }
+        .mapping-header div:first-child, .category-header div:first-child { flex: 1; }
+        .mapping-header div:nth-child(2), .category-header div:nth-child(2) { flex: 1; }
+        .mapping-header div:last-child, .category-header div:last-child { width: 50px; }
+        .protocol-item, .result-item { background: #f8f9fa; border-radius: 12px; padding: 15px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; border: 1px solid #e9ecef; }
+        .protocol-item:hover, .result-item:hover { background: #e9ecef; transform: translateX(5px); }
+        .protocol-item.selected { background: #d4edda; border-left: 4px solid #28a745; }
+        .protocol-title, .result-title { font-weight: bold; font-size: 1rem; margin-bottom: 5px; }
+        .protocol-details, .result-details { font-size: 0.8rem; color: #666; }
+        .results-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .results-table th, .results-table td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        .results-table th { background: #0f3460; color: white; }
+        .status-select { padding: 6px; border-radius: 6px; border: 1px solid #ddd; background: white; }
+        .czas-input { width: 140px; padding: 6px; border-radius: 6px; border: 1px solid #ddd; font-family: monospace; }
+        .miejsce-input { width: 60px; padding: 6px; border-radius: 6px; border: 1px solid #ddd; text-align: center; }
+        .czas-biegu-cell { font-family: monospace; font-weight: bold; color: #0f3460; }
+        .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); display: flex; justify-content: center; align-items: center; z-index: 10000; }
+        .login-box { background: white; padding: 40px; border-radius: 32px; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .login-box h2 { margin-bottom: 10px; color: #1a1a2e; }
+        .login-box p { color: #666; margin-bottom: 25px; }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 40px; border: 1px solid #cbd5e1; font-size: 1rem; }
+        .login-box button { width: 100%; margin-top: 15px; background: #28a745; padding: 12px; font-size: 1.1rem; color: white; border: none; border-radius: 40px; cursor: pointer; }
+        .login-box button:hover { background: #218838; }
+        .login-error { color: #dc3545; margin-top: 15px; display: none; }
+        .logout-btn { margin-top: auto; margin-bottom: 20px; margin-left: 12px; margin-right: 12px; background: #dc3545; padding: 10px 16px; border-radius: 40px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; width: calc(100% - 24px); }
+        .logout-btn:hover { background: #c82333; }
+        .user-info { margin: 10px 12px; font-size: 0.7rem; color: #888; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 20px; text-align: center; }
+        .ranking-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 20px; }
+        .ranking-table th, .ranking-table td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        .ranking-table th { background: #0f3460; color: white; }
+        .position-cell { font-weight: bold; text-align: center; width: 50px; }
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; }
+        .status-pk { background: #e3f2fd; color: #1565c0; }
+        .status-dnf { background: #fff3e0; color: #e65100; }
+        .status-dns { background: #fce4ec; color: #c2185b; }
+        .status-dq { background: #ffebee; color: #c62828; }
+        .wip-badge { background: #ffc107; color: #333; padding: 2px 6px; border-radius: 12px; font-size: 0.7rem; margin-left: 8px; }
+        .unit-select { width: 80px; padding: 4px; font-size: 0.8rem; }
+        @media print { .left-panel, .right-panel, button { display: none; } .middle-panel { width: 100%; margin: 0; padding: 0; } .card { box-shadow: none; } }
+    </style>
+</head>
+<body>
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-box">
+            <div style="font-size: 48px; margin-bottom: 15px;">🏃</div>
+            <h2>Panel Zawodów</h2>
+            <p>Zaloguj się aby kontynuować</p>
+            <input type="email" id="loginEmail" placeholder="Email">
+            <input type="password" id="loginPassword" placeholder="Hasło">
+            <button id="loginBtn">Zaloguj</button>
+            <div id="loginError" class="login-error">❌ Nieprawidłowy email lub hasło</div>
+        </div>
+    </div>
+
+    <div id="mainContent" style="display: none;">
+        <div class="dashboard">
+            <div class="left-panel">
+                <div class="logo"><h2>🏃 Panel Zawodów</h2><p>System pomiaru czasu</p></div>
+                <button class="nav-btn" data-view="mappingKonkurencji"><span class="icon">🗺️</span> 1. Mapowanie konkurencji</button>
+                <button class="nav-btn" data-view="mappingKategorii"><span class="icon">🏷️</span> 2. Mapowanie kategorii</button>
+                <button class="nav-btn" data-view="import"><span class="icon">📂</span> 3. Załaduj CSV → JSON/DB</button>
+                <button class="nav-btn" data-view="preview"><span class="icon">👁️</span> 4. Podgląd danych</button>
+                <button class="nav-btn" data-view="qrcode"><span class="icon">🔲</span> 5. Generuj kody QR</button>
+                <button class="nav-btn" data-view="email"><span class="icon">📧</span> 6. Wysyłka grupowa e-mail</button>
+                <button class="nav-btn" data-view="camera"><span class="icon">🎥</span> 7. Uruchom kamerę</button>
+                <button class="nav-btn" data-view="results"><span class="icon">✍️</span> 8. Wprowadź dane z mety</button>
+                <button class="nav-btn" data-view="ranking"><span class="icon">📊</span> 9. Wyniki końcowe (biegi)</button>
+                <button class="nav-btn" data-view="technical"><span class="icon">🏅</span> 10. Konkurencje techniczne</button>
+                <div id="userInfo" class="user-info"></div>
+                <button id="logoutBtn" class="logout-btn"><span>🚪</span> Wyloguj</button>
+            </div>
+            <div class="middle-panel" id="middlePanel"><div class="card"><h3>Witaj w panelu sterowania</h3><p>Wybierz opcję z lewego panelu, aby rozpocząć.</p></div></div>
+            <div class="right-panel"><div class="errors-header"><span>⚠️ Logi i błędy</span><button class="clear-errors" id="clearErrors">Wyczyść</button></div><div class="errors-list" id="errorsList"><div class="error-item success-item">✅ System gotowy.</div></div></div>
+        </div>
+    </div>
+
+    <script>
+    // ==================== KONFIGURACJA FIREBASE ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyD2HMHEDyZ6jrUHwjv8wDaxd7swi9rtn2k",
+        authDomain: "zawodylekkoatletyczne.firebaseapp.com",
+        databaseURL: "https://zawodylekkoatletyczne-default-rtdb.firebaseio.com",
+        projectId: "zawodylekkoatletyczne",
+        storageBucket: "zawodylekkoatletyczne.firebasestorage.app",
+        messagingSenderId: "812081786407",
+        appId: "1:812081786407:web:7f820e436490693a9d2802"
+    };
+
+    let database, auth;
+    let isFirebaseConnected = false;
+    let currentUser = null;
+    let mapowanieKonkurencji = {};
+    let mapowanieKategorii = {};
+    let zawodnicyMap = new Map();
+    let konkurencjeList = [];
+
+    try {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        auth = firebase.auth();
+        database.ref('.info/connected').on('value', (snap) => {
+            isFirebaseConnected = snap.val() === true;
+            if (currentUser) addLog(isFirebaseConnected ? '✅ Połączono z Firebase' : '⚠️ Brak połączenia', isFirebaseConnected ? 'success' : 'warning');
+        });
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+                document.getElementById('userInfo').innerHTML = `👤 ${user.email}`;
+                addLog(`✅ Zalogowano jako: ${user.email}`, 'success');
+                loadAllMappings();
+                loadZawodnicy();
+            } else {
+                document.getElementById('mainContent').style.display = 'none';
+                document.getElementById('loginOverlay').style.display = 'flex';
+                currentUser = null;
+            }
+        });
+    } catch (e) { console.error("Firebase init error:", e); }
+
+    function login() {
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        if (!email || !password) {
+            document.getElementById('loginError').style.display = 'block';
+            document.getElementById('loginError').innerText = '❌ Wprowadź email i hasło';
+            return;
+        }
+        document.getElementById('loginError').style.display = 'none';
+        document.getElementById('loginBtn').disabled = true;
+        auth.signInWithEmailAndPassword(email, password)
+            .then(() => { document.getElementById('loginBtn').disabled = false; })
+            .catch(() => {
+                document.getElementById('loginBtn').disabled = false;
+                document.getElementById('loginError').style.display = 'block';
+                document.getElementById('loginError').innerText = '❌ Nieprawidłowy email lub hasło';
+            });
+    }
+    
+    function logout() { auth.signOut().then(() => addLog('✅ Wylogowano', 'success')); }
+    
+    function addLog(message, type = 'error') {
+        const errorsList = document.getElementById('errorsList');
+        const logDiv = document.createElement('div');
+        logDiv.className = `error-item ${type === 'success' ? 'success-item' : (type === 'warning' ? 'warning-item' : '')}`;
+        logDiv.innerHTML = `${new Date().toLocaleTimeString()} - ${message}`;
+        errorsList.insertBefore(logDiv, errorsList.firstChild);
+        while (errorsList.children.length > 50) errorsList.removeChild(errorsList.lastChild);
+    }
+
+    document.getElementById('clearErrors').addEventListener('click', () => {
+        document.getElementById('errorsList').innerHTML = '';
+        addLog('Logi wyczyszczone', 'success');
+    });
+
+    function showView(viewName) {
+        const panel = document.getElementById('middlePanel');
+        if (viewName === 'mappingKonkurencji') showMappingKonkurencjiView(panel);
+        else if (viewName === 'mappingKategorii') showMappingKategoriiView(panel);
+        else if (viewName === 'import') showImportView(panel);
+        else if (viewName === 'preview') showPreviewView(panel);
+        else if (viewName === 'qrcode') showQRCodeView(panel);
+        else if (viewName === 'email') showEmailView(panel);
+        else if (viewName === 'camera') showCameraWipView(panel);
+        else if (viewName === 'results') showResultsView(panel);
+        else if (viewName === 'ranking') showRankingView(panel);
+        else if (viewName === 'technical') showTechnicalView(panel);
+        
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.querySelector(`.nav-btn[data-view="${viewName}"]`);
+        if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    // ==================== FUNKCJE POMOCNICZE ====================
+    function saveJsonToDisk(jsonData, suggestedFileName) {
+        try {
+            if (!jsonData || Object.keys(jsonData).length === 0) return false;
+            const blob = new Blob([JSON.stringify(jsonData, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = suggestedFileName;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+            addLog(`💾 Plik zapisany jako "${suggestedFileName}"`, 'success');
+            return true;
+        } catch (err) { addLog(`❌ Błąd zapisu: ${err.message}`, 'error'); return false; }
+    }
+
+    function saveCsvToDisk(csvData, suggestedFileName) {
+        try {
+            if (!csvData || csvData.length === 0) return false;
+            const blob = new Blob([csvData], {type: 'text/csv;charset=utf-8;'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = suggestedFileName;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+            addLog(`💾 Plik CSV zapisany jako "${suggestedFileName}"`, 'success');
+            return true;
+        } catch (err) { addLog(`❌ Błąd zapisu CSV: ${err.message}`, 'error'); return false; }
+    }
+
+    function generateCleanId(rowData, index) {
+        if (rowData['ID'] && rowData['ID'].toString().trim() !== '') return rowData['ID'].toString().trim();
+        return `${Date.now()}${index}`;
+    }
+
+    function getKategoriaZRocznika(rocznik) {
+        if (!rocznik) return "OPEN";
+        return mapowanieKategorii[rocznik.toString()] || "OPEN";
+    }
+
+    function getPelnaKategoria(plec, rocznik) {
+        const kategoriaWiekowa = getKategoriaZRocznika(rocznik);
+        if (!plec || !kategoriaWiekowa) return "";
+        return `${plec} ${kategoriaWiekowa}`;
+    }
+
+    function czyscKonkurencje(nazwa) {
+        if (!nazwa) return "";
+        let nazwaCzysta = nazwa.trim().toUpperCase();
+        if (mapowanieKonkurencji[nazwaCzysta]) return mapowanieKonkurencji[nazwaCzysta];
+        for (let [key, value] of Object.entries(mapowanieKonkurencji)) {
+            if (nazwaCzysta.includes(key) || key.includes(nazwaCzysta)) return value;
+        }
+        return nazwaCzysta;
+    }
+
+    function parseCSVRow(row) {
+        const result = [];
+        let inQuotes = false;
+        let current = '';
+        for (let i = 0; i < row.length; i++) {
+            const char = row[i];
+            if (char === '"') inQuotes = !inQuotes;
+            else if (char === ',' && !inQuotes) { result.push(current); current = ''; }
+            else current += char;
+        }
+        result.push(current);
+        return result;
+    }
+
+    async function loadZawodnicy() {
+        const snapshot = await database.ref('zawodnicy').once('value');
+        const data = snapshot.val();
+        if (data) {
+            zawodnicyMap.clear();
+            for (const [id, z] of Object.entries(data)) {
+                zawodnicyMap.set(id, z);
+                if (z.nr_startowy) zawodnicyMap.set(z.nr_startowy, z);
+            }
+        }
+    }
+
+    // ==================== 1. MAPOWANIE KONKURENCJI ====================
+    function loadMappingKonkurencji() {
+        database.ref('mapowanie_konkurencji').once('value').then(s => { mapowanieKonkurencji = s.val() || {}; if (Object.keys(mapowanieKonkurencji).length === 0) { mapowanieKonkurencji = { "100M - BIEG": "100M", "100M - ELIM": "100M", "BIEG NA 100M": "100M", "400M PRZEZ PŁOTKI": "400M_PP", "1500 M": "1500M", "SKOK W DAL": "SKOK_W_DAL" }; saveMappingKonkurencji(); } });
+    }
+    function loadMappingKategorii() {
+        database.ref('mapowanie_kategorii').once('value').then(s => { mapowanieKategorii = s.val() || {}; if (Object.keys(mapowanieKategorii).length === 0) { for (let i = 2026; i >= 1898; i--) { if (i >= 2022) mapowanieKategorii[i] = "00-04"; else if (i >= 2020) mapowanieKategorii[i] = "05-06"; else if (i >= 2017) mapowanieKategorii[i] = "07-09"; else if (i >= 2014) mapowanieKategorii[i] = "10-12"; else if (i >= 2010) mapowanieKategorii[i] = "13-16"; else mapowanieKategorii[i] = "OPEN"; } saveMappingKategorii(); } });
+    }
+    function saveMappingKonkurencji() { if (database && isFirebaseConnected && currentUser) database.ref('mapowanie_konkurencji').set(mapowanieKonkurencji); }
+    function saveMappingKategorii() { if (database && isFirebaseConnected && currentUser) database.ref('mapowanie_kategorii').set(mapowanieKategorii); }
+    function loadAllMappings() { loadMappingKonkurencji(); loadMappingKategorii(); }
+
+    function showMappingKonkurencjiView(panel) {
+        function render() {
+            const container = document.getElementById('mappingList');
+            if (!container) return;
+            if (Object.keys(mapowanieKonkurencji).length === 0) { container.innerHTML = '<div style="text-align:center;padding:20px;">Brak mapowań</div>'; return; }
+            let html = '';
+            for (let [oryginal, poprawny] of Object.entries(mapowanieKonkurencji)) {
+                html += `<div class="mapping-row"><input type="text" class="mapping-original" value="${oryginal}"><input type="text" class="mapping-correct" value="${poprawny}"><button class="delete-mapping-btn danger">🗑️</button></div>`;
+            }
+            container.innerHTML = html;
+            document.querySelectorAll('.delete-mapping-btn').forEach(btn => { btn.addEventListener('click', () => { const row = btn.closest('.mapping-row'); const original = row.querySelector('.mapping-original').value; delete mapowanieKonkurencji[original]; saveMappingKonkurencji(); render(); }); });
+            document.querySelectorAll('.mapping-original').forEach(inp => { inp.addEventListener('change', function() { const row = this.closest('.mapping-row'); const oldKey = row.querySelector('.mapping-original').getAttribute('value'); const newKey = this.value; const value = row.querySelector('.mapping-correct').value; if (oldKey !== newKey) delete mapowanieKonkurencji[oldKey]; mapowanieKonkurencji[newKey] = value; saveMappingKonkurencji(); render(); }); });
+            document.querySelectorAll('.mapping-correct').forEach(inp => { inp.addEventListener('change', function() { const row = this.closest('.mapping-row'); const key = row.querySelector('.mapping-original').value; mapowanieKonkurencji[key] = this.value; saveMappingKonkurencji(); render(); }); });
+        }
+        panel.innerHTML = `<div class="card"><h3>🗺️ Mapowanie konkurencji</h3><div style="display:flex;gap:10px;margin-bottom:15px;"><input type="text" id="newOriginal" placeholder="Oryginalna nazwa"><input type="text" id="newCorrect" placeholder="Poprawna nazwa"><button id="addMappingBtn" class="success">➕ Dodaj</button></div><div id="mappingList"></div><div style="margin-top:15px;"><button id="exportMappingBtn" class="info">📥 Eksportuj</button><button id="importMappingBtn" class="info">📤 Importuj</button><input type="file" id="importFile" style="display:none;"></div></div>`;
+        render();
+        document.getElementById('addMappingBtn').addEventListener('click', () => { const o = document.getElementById('newOriginal').value.trim().toUpperCase(); const c = document.getElementById('newCorrect').value.trim().toUpperCase(); if (o && c) { mapowanieKonkurencji[o] = c; saveMappingKonkurencji(); render(); document.getElementById('newOriginal').value = ''; document.getElementById('newCorrect').value = ''; } });
+        document.getElementById('exportMappingBtn').addEventListener('click', () => saveJsonToDisk(mapowanieKonkurencji, `mapowanie_konkurencji.json`));
+        document.getElementById('importMappingBtn').addEventListener('click', () => document.getElementById('importFile').click());
+        document.getElementById('importFile').addEventListener('change', e => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => { try { const imported = JSON.parse(ev.target.result); mapowanieKonkurencji = imported; saveMappingKonkurencji(); render(); } catch(err) { addLog('❌ Błąd importu', 'error'); } }; reader.readAsText(file); });
+    }
+
+    function showMappingKategoriiView(panel) {
+        function render() {
+            const container = document.getElementById('categoryList');
+            if (!container) return;
+            if (Object.keys(mapowanieKategorii).length === 0) { container.innerHTML = '<div style="text-align:center;padding:20px;">Brak mapowań</div>'; return; }
+            let html = '';
+            for (let [rocznik, kategoria] of Object.entries(mapowanieKategorii)) {
+                html += `<div class="category-row"><input type="text" class="category-rocznik" value="${rocznik}"><input type="text" class="category-value" value="${kategoria}"><button class="delete-category-btn danger">🗑️</button></div>`;
+            }
+            container.innerHTML = html;
+            document.querySelectorAll('.delete-category-btn').forEach(btn => { btn.addEventListener('click', () => { const row = btn.closest('.category-row'); const rocznik = row.querySelector('.category-rocznik').value; delete mapowanieKategorii[rocznik]; saveMappingKategorii(); render(); }); });
+            document.querySelectorAll('.category-rocznik').forEach(inp => { inp.addEventListener('change', function() { const row = this.closest('.category-row'); const oldKey = row.querySelector('.category-rocznik').getAttribute('value'); const newKey = this.value; const value = row.querySelector('.category-value').value; if (oldKey !== newKey) delete mapowanieKategorii[oldKey]; mapowanieKategorii[newKey] = value; saveMappingKategorii(); render(); }); });
+            document.querySelectorAll('.category-value').forEach(inp => { inp.addEventListener('change', function() { const row = this.closest('.category-row'); const key = row.querySelector('.category-rocznik').value; mapowanieKategorii[key] = this.value; saveMappingKategorii(); render(); }); });
+        }
+        panel.innerHTML = `<div class="card"><h3>🏷️ Mapowanie kategorii (rocznik → kategoria)</h3><div style="display:flex;gap:10px;margin-bottom:15px;"><input type="text" id="newRocznik" placeholder="Rocznik"><input type="text" id="newKategoria" placeholder="Kategoria"><button id="addCategoryBtn" class="success">➕ Dodaj</button></div><div id="categoryList"></div><div style="margin-top:15px;"><button id="exportCategoryBtn" class="info">📥 Eksportuj</button><button id="importCategoryBtn" class="info">📤 Importuj</button><input type="file" id="importCatFile" style="display:none;"></div></div>`;
+        render();
+        document.getElementById('addCategoryBtn').addEventListener('click', () => { const r = document.getElementById('newRocznik').value.trim(); const k = document.getElementById('newKategoria').value.trim().toUpperCase(); if (r && k) { mapowanieKategorii[r] = k; saveMappingKategorii(); render(); document.getElementById('newRocznik').value = ''; document.getElementById('newKategoria').value = ''; } });
+        document.getElementById('exportCategoryBtn').addEventListener('click', () => saveJsonToDisk(mapowanieKategorii, `mapowanie_kategorii.json`));
+        document.getElementById('importCategoryBtn').addEventListener('click', () => document.getElementById('importCatFile').click());
+        document.getElementById('importCatFile').addEventListener('change', e => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => { try { const imported = JSON.parse(ev.target.result); mapowanieKategorii = imported; saveMappingKategorii(); render(); } catch(err) { addLog('❌ Błąd importu', 'error'); } }; reader.readAsText(file); });
+    }
+
+    // ==================== 3. IMPORT CSV ====================
+    function showImportView(panel) {
+        panel.innerHTML = `<div class="card"><h3>📂 Załaduj CSV → JSON/DB</h3><div class="file-upload" id="csvUploadArea">📁 Kliknij lub przeciągnij plik CSV</div><input type="file" id="csvFileInput" accept=".csv" style="display:none"><div style="margin-top:20px;"><label class="checkbox-label"><input type="checkbox" id="sendToFirebaseCheckbox" checked>📡 Wyślij do Firebase</label><label class="checkbox-label"><input type="checkbox" id="saveJsonLocallyCheckbox" checked>💾 Zapisz JSON lokalnie</label><label class="checkbox-label"><input type="checkbox" id="exportCsvCheckbox" checked>📧 Wygeneruj plik CSV do Mail Merge</label></div><div id="importProgress"></div></div>`;
+        const uploadArea = document.getElementById('csvUploadArea');
+        const fileInput = document.getElementById('csvFileInput');
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => processCSV(e.target.files[0]));
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.style.borderColor = '#0f3460'; });
+        uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = '#ccc'; });
+        uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.style.borderColor = '#ccc'; const file = e.dataTransfer.files[0]; if (file && file.name.endsWith('.csv')) processCSV(file); else addLog('Proszę wybrać plik CSV', 'warning'); });
+    }
+
+    function processCSV(file) {
+        if (!file) return;
+        const sendToFirebase = document.getElementById('sendToFirebaseCheckbox')?.checked || false;
+        const saveLocally = document.getElementById('saveJsonLocallyCheckbox')?.checked || false;
+        const exportCsv = document.getElementById('exportCsvCheckbox')?.checked || false;
+        addLog(`Przetwarzanie: ${file.name}`, 'success');
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const rows = text.split(/\r?\n/);
+            if (rows.length < 2) { addLog('Plik CSV jest pusty', 'error'); return; }
+            const headers = rows[0].split(',').map(h => h.replace(/["']/g, '').trim());
+            const zawodnicy = {};
+            let importCount = 0;
+            for (let i = 1; i < rows.length; i++) {
+                if (!rows[i].trim()) continue;
+                const values = parseCSVRow(rows[i]);
+                if (values.length < headers.length) continue;
+                const rowData = {};
+                headers.forEach((h, idx) => { rowData[h] = values[idx] ? values[idx].replace(/["']/g, '').trim() : ''; });
+                if (rowData['REZYGNACJA'] === '1') continue;
+                let rocznik = '';
+                if (rowData['DATA URODZENIA']) { const yearMatch = rowData['DATA URODZENIA'].match(/\d{4}/); rocznik = yearMatch ? parseInt(yearMatch[0]) : ''; }
+                let konkurencja1 = rowData['DYSTANS'] || '';
+                if (konkurencja1.includes(' - ')) konkurencja1 = konkurencja1.split(' - ')[0];
+                let mappedKonkurencja1 = czyscKonkurencje(konkurencja1);
+                let konkurencja2 = rowData['Dodatkowa konkurencja'] || '';
+                if (konkurencja2 === 'Brak' || konkurencja2 === '') konkurencja2 = null;
+                let mappedKonkurencja2 = konkurencja2 ? czyscKonkurencje(konkurencja2) : null;
+                const zawodnikId = generateCleanId(rowData, i);
+                const plec = rowData['PŁEĆ'] || '';
+                const pelnaKategoria = getPelnaKategoria(plec, rocznik);
+                zawodnicy[zawodnikId] = {
+                    id: zawodnikId, imie: (rowData['IMIĘ'] || '').toUpperCase(), nazwisko: (rowData['NAZWISKO'] || '').toUpperCase(),
+                    rocznik: rocznik, kategoria_wiekowa: getKategoriaZRocznika(rocznik), pelna_kategoria: pelnaKategoria,
+                    konkurencja1: mappedKonkurencja1, konkurencja2: mappedKonkurencja2, nr_startowy: '', pakiet_odebrany: 'NIE',
+                    plec: plec, rezygnacja: 'FALSE', email: rowData['EMAIL'] || ''
+                };
+                importCount++;
+            }
+            const timestamp = new Date().toISOString().slice(0,19).replace(/:/g, '-');
+            if (saveLocally) saveJsonToDisk(zawodnicy, `zawodnicy_${timestamp}.json`);
+            if (exportCsv && Object.keys(zawodnicy).length > 0) {
+                const rowsCsv = [["ID", "IMIĘ", "EMAIL", "Path"]];
+                for (const [id, z] of Object.entries(zawodnicy)) rowsCsv.push([id, z.imie, z.email, `${id}.png`]);
+                const csvContent = rowsCsv.map(row => row.map(cell => typeof cell === 'string' && (cell.includes(',') || cell.includes('"')) ? `"${cell.replace(/"/g, '""')}"` : cell).join(',')).join('\n');
+                setTimeout(() => saveCsvToDisk(csvContent, `do_wysylki_${timestamp}.csv`), 500);
+            }
+            if (sendToFirebase && isFirebaseConnected) {
+                database.ref('zawodnicy').set(zawodnicy).then(() => addLog(`✅ Zapisano ${importCount} zawodników do Firebase`, 'success'));
+            }
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    // ==================== 4. PODGLĄD DANYCH ====================
+    function showPreviewView(panel) {
+        panel.innerHTML = `<div class="card"><h3>👁️ Podgląd danych z Firebase</h3><button id="refreshPreviewBtn">🔄 Odśwież</button><div id="previewTableContainer" class="table-container"><div class="loading">Ładowanie...</div></div></div>`;
+        loadPreviewData();
+        document.getElementById('refreshPreviewBtn')?.addEventListener('click', loadPreviewData);
+    }
+    function loadPreviewData() {
+        const container = document.getElementById('previewTableContainer');
+        if (!container) return;
+        if (!isFirebaseConnected) { container.innerHTML = '<div class="error-item">⚠️ Brak połączenia</div>'; return; }
+        container.innerHTML = '<div class="loading">⏳ Ładowanie...</div>';
+        database.ref('zawodnicy').once('value').then(snapshot => {
+            const data = snapshot.val();
+            if (!data || Object.keys(data).length === 0) { container.innerHTML = '<div class="card">📭 Brak danych</div>'; return; }
+            const zawodnicy = Object.values(data);
+            let html = '<div style="overflow-x:auto;"><table><thead><tr style="background:#0a0f2c;color:white;">';
+            const columns = ['id', 'imie', 'nazwisko', 'rocznik', 'pelna_kategoria', 'konkurencja1', 'konkurencja2', 'nr_startowy', 'pakiet_odebrany', 'plec', 'rezygnacja', 'email'];
+            columns.forEach(col => html += `<th style="padding:10px;">${col}</th>`);
+            html += '</thead><tbody>';
+            zawodnicy.forEach((z, idx) => { html += `<tr style="background:${idx%2===0?'#f9f9f9':'white'};">`; columns.forEach(col => html += `<td style="padding:8px;">${z[col] || ''}</td>`); html += '</tr>'; });
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+            addLog(`✅ Wyświetlono ${zawodnicy.length} zawodników`, 'success');
+        }).catch(err => { container.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`; });
+    }
+
+    // ==================== 5. GENEROWANIE KODÓW QR ====================
+    function showQRCodeView(panel) {
+        panel.innerHTML = `<div class="card"><h3>🔲 Generowanie kodów QR</h3><div class="instruction-box"><strong>📌 Instrukcja:</strong><br>Program do generowania kodów QR znajduje się pod ścieżką:<br><div class="file-path">D:\\_BIEGI_2026_\\Program\\QR_code\\dist\\QR_Generator.exe</div></div><button id="openQrFolderBtn">📂 Otwórz folder z programem</button></div>`;
+        document.getElementById('openQrFolderBtn')?.addEventListener('click', () => { alert('Otwórz ręcznie folder:\nD:\\_BIEGI_2026_\\Program\\QR_code\\dist\\'); addLog('Folder programu QR', 'success'); });
+    }
+
+    // ==================== 6. WYSYŁKA GRUPOWA E-MAIL ====================
+    function showEmailView(panel) {
+        const today = new Date();
+        const dataZawodow = `${today.getDate().toString().padStart(2,'0')}-${(today.getMonth()+1).toString().padStart(2,'0')}-${today.getFullYear()}`;
+        panel.innerHTML = `<div class="card"><h3>📧 Wysyłka grupowa e-mail</h3><div class="instruction-box"><strong>📌 Instrukcja:</strong></div><div class="step-item"><span class="step-number">1</span> Otwórz Thunderbird</div><div class="step-item"><span class="step-number">2</span> Utwórz nowy e-mail</div><div class="step-item"><span class="step-number">3</span> Temat: <strong>Twoje ID i QR-code na najbliższe zawody ${dataZawodow}</strong></div><div class="step-item"><span class="step-number">4</span> W polu "Do" wpisz: <span class="placeholder-example">{{EMAIL}}</span></div><div class="step-item"><span class="step-number">5</span> Treść:<br>Witaj {{IMIĘ}}<br><br>oto twoje {{ID}} - w załączniku znajdziesz QR-code.<br><br>Widzimy się na mecie!</div><div class="step-item"><span class="step-number">6</span> Użyj wtyczki Mail Merge - wybierz plik CSV <strong>do_wysylki_*.csv</strong>, załącznik: <span class="placeholder-example">{{Path}}</span></div></div>`;
+    }
+
+    // ==================== 7. KAMERA (WIP) ====================
+    function showCameraWipView(panel) { 
+    panel.innerHTML = `<div class="card">
+        <h3>🎥 Uruchom kamerę - Fotofinish</h3>
+        <div class="instruction-box">
+            <strong>📌 Instrukcja obsługi pomiaru czasu z kamery:</strong><br><br>
+            Program do odczytywania czasu z mety znajduje się na pulpicie pod nazwą:<br>
+            <div class="file-path" style="background:#e7f3ff; font-size:1.1rem; text-align:center; margin:15px 0;">
+                <strong>📹 Foto_finish</strong>
+            </div>
+            <strong>Krok po kroku:</strong><br>
+            1. Otwórz program <strong>Foto_finish</strong> z pulpitu<br>
+            2. Postępuj zgodnie z instrukcjami programu<br>
+            3. Wprowadź czas ręcznie w zakładce <strong>"8. Wprowadź dane z mety"</strong><br><br>
+            <span style="color: #28a745;">✅ Program umożliwia dokładny pomiar czasu z fotofiniszu.</span>
+        </div>
+    </div>`; 
+}
+    // ==================== 8. WPROWADŹ DANE Z METY ====================
+    let currentProtocol = null, currentProtocolId = null;
+
+    function parseStartDateTime(startTimeStr) {
+        if (!startTimeStr) return null;
+        try {
+            const [datePart, timePart] = startTimeStr.split(' ');
+            const [year, month, day] = datePart.split('-');
+            let hours = 0, minutes = 0, seconds = 0, milliseconds = 0;
+            if (timePart) {
+                const timeParts = timePart.split(':');
+                hours = parseInt(timeParts[0]) || 0;
+                minutes = parseInt(timeParts[1]) || 0;
+                const secParts = (timeParts[2] || '0').split('.');
+                seconds = parseInt(secParts[0]) || 0;
+                milliseconds = parseInt(secParts[1]) || 0;
+            }
+            return new Date(year, month-1, day, hours, minutes, seconds, milliseconds);
+        } catch(e) { return null; }
+    }
+    
+    function parseMetaTime(metaTimeStr, startDate) {
+        if (!metaTimeStr || !startDate) return null;
+        try {
+            const timeParts = metaTimeStr.split(':');
+            let hours = parseInt(timeParts[0]) || 0;
+            let minutes = parseInt(timeParts[1]) || 0;
+            const secParts = (timeParts[2] || '0').split('.');
+            let seconds = parseInt(secParts[0]) || 0;
+            let milliseconds = parseInt(secParts[1]) || 0;
+            const metaDate = new Date(startDate);
+            metaDate.setHours(hours, minutes, seconds, milliseconds);
+            if (metaDate < startDate) metaDate.setDate(metaDate.getDate() + 1);
+            return metaDate;
+        } catch(e) { return null; }
+    }
+    
+    function formatTimeDifference(startDate, metaDate) {
+        if (!startDate || !metaDate) return { formatted: '', seconds: null };
+        const diffMs = metaDate - startDate;
+        if (diffMs < 0) return { formatted: '', seconds: null };
+        const totalSeconds = diffMs / 1000;
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = Math.floor(totalSeconds % 60);
+        const milliseconds = Math.floor((totalSeconds % 1) * 1000);
+        const formatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+        return { formatted, seconds: totalSeconds };
+    }
+    function obliczCzasBiegu(czasStartuStr, czasNaMecieStr) {
+        if (!czasStartuStr || !czasNaMecieStr) return { formatted: '', seconds: null };
+        const startDate = parseStartDateTime(czasStartuStr);
+        if (!startDate) return { formatted: '', seconds: null };
+        const metaDate = parseMetaTime(czasNaMecieStr, startDate);
+        if (!metaDate) return { formatted: '', seconds: null };
+        return formatTimeDifference(startDate, metaDate);
+    }
+
+    function showResultsView(panel) {
+        panel.innerHTML = `<div class="card"><h3>📋 Protokoły biegowe</h3><button id="refreshProtocolsBtn" class="info">🔄 Odśwież listę</button><div id="protocolsList" style="margin-top:15px;max-height:300px;overflow-y:auto;"></div></div><div id="editPanel" style="display:none;"><div class="card"><h3>✏️ Edycja wyników</h3><div id="protocolInfo"></div><div id="resultsEditor" style="margin-top:15px;overflow-x:auto;"></div><div style="display:flex;gap:10px;margin-top:20px;"><button id="saveResultsBtn" class="success">💾 Zapisz wyniki</button><button id="deleteProtocolBtn" class="danger">🗑️ Usuń protokół</button><button id="closeEditBtn" class="secondary">✖ Zamknij</button></div></div></div>`;
+        loadProtocolsList();
+        document.getElementById('refreshProtocolsBtn').addEventListener('click', () => loadProtocolsList());
+        document.getElementById('closeEditBtn')?.addEventListener('click', () => { document.getElementById('editPanel').style.display = 'none'; });
+    }
+    
+    function loadProtocolsList() {
+        const container = document.getElementById('protocolsList');
+        if (!container) return;
+        if (!isFirebaseConnected) { container.innerHTML = '<div class="error-item">⚠️ Brak połączenia</div>'; return; }
+        container.innerHTML = '<div class="loading">⏳ Ładowanie...</div>';
+        database.ref('protokoly').orderByChild('data_utworzenia').once('value').then(snapshot => {
+            const data = snapshot.val();
+            if (!data || Object.keys(data).length === 0) { container.innerHTML = '<div class="card">📭 Brak protokołów.</div>'; return; }
+            const protocols = Object.entries(data).map(([id, p]) => ({ id, ...p }));
+            protocols.sort((a, b) => new Date(b.data_utworzenia) - new Date(a.data_utworzenia));
+            let html = '';
+            protocols.forEach(p => { html += `<div class="protocol-item" data-id="${p.id}"><div class="protocol-title">${p.konkurencja || '?'} - Bieg ${p.numer_biegu || '?'} (${p.kategoria || '?'})</div><div class="protocol-details">Czas startu: ${p.czas_startu || 'brak'} | Tory: ${p.ilosc_torow || 0}</div></div>`; });
+            container.innerHTML = html;
+            document.querySelectorAll('.protocol-item').forEach(el => { el.addEventListener('click', () => { loadProtocolForEdit(el.getAttribute('data-id')); document.querySelectorAll('.protocol-item').forEach(p => p.classList.remove('selected')); el.classList.add('selected'); }); });
+        }).catch(err => { container.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`; });
+    }
+    
+    async function loadProtocolForEdit(protocolId) {
+        const snapshot = await database.ref(`protokoly/${protocolId}`).once('value');
+        const protocol = snapshot.val();
+        if (!protocol) { addLog('❌ Nie znaleziono protokołu', 'error'); return; }
+        currentProtocol = protocol;
+        currentProtocolId = protocolId;
+        
+        const zawodnicySnap = await database.ref('zawodnicy').once('value');
+        const zawodnicyData = zawodnicySnap.val() || {};
+        
+        function getZawodnikData(nrStartowy) {
+            if (!nrStartowy) return null;
+            for (const [id, z] of Object.entries(zawodnicyData)) {
+                if (z.nr_startowy === nrStartowy || z.id === nrStartowy) return z;
+            }
+            return null;
+        }
+        
+        const kategoriaBiegu = protocol.kategoria || '';
+        document.getElementById('protocolInfo').innerHTML = `<div class="info-note">
+            <strong>${protocol.konkurencja || '?'} - Bieg ${protocol.numer_biegu || '?'}</strong><br>
+            Kategoria biegu: <strong>${kategoriaBiegu}</strong><br>
+            Czas startu: ${protocol.czas_startu || 'nieustalony'} ${protocol.falstart ? '⚠️ FALSTART' : ''}<br>
+            <small>Format czasu na mecie: HH:MM:SS.mmm</small><br>
+            <small>Ręczny czas biegu: MM:SS.mmm (np. 01:23.456)</small>
+            <button id="globalRecalcBtn" class="info" style="margin-left:10px;">🔄 Przelicz wszystkie czasy</button>
+        </div>`;
+        
+        const tory = protocol.tory || [];
+        const wyniki = protocol.wyniki || [];
+        let html = `<table class="results-table"><thead>
+            <th>Tor</th><th>Nr</th><th>Zawodnik</th><th>Rocznik</th><th>Kategoria</th>
+            <th>Czas na mecie</th><th>Czas biegu</th><th>Status</th><th>Miejsce</th>
+        </thead><tbody>`;
+        
+        for (let i = 0; i < tory.length; i++) {
+            const tor = tory[i];
+            const wynik = wyniki[i] || {};
+            const czasNaMecie = wynik.czas_na_mecie || '';
+            const recznyCzasBiegu = wynik.reczny_czas_biegu || '';
+            const status = wynik.status || '';
+            const miejsce = wynik.miejsce || '';
+            
+            const zawodnikData = getZawodnikData(tor.nr_startowy);
+            const imie = zawodnikData?.imie || '';
+            const nazwisko = zawodnikData?.nazwisko || '';
+            const rocznik = zawodnikData?.rocznik || '';
+            const kategoriaZaw = zawodnikData?.pelna_kategoria || zawodnikData?.kategoria_wiekowa || '';
+            
+            let czasBiegu = obliczCzasBiegu(protocol.czas_startu, czasNaMecie);
+            if (recznyCzasBiegu) czasBiegu = { formatted: recznyCzasBiegu, seconds: null };
+            
+            html += `<tr data-tor="${tor.numer}">
+                <td>${tor.numer}</td>
+                <td><input type="text" class="nr-startowy-input" data-tor="${tor.numer}" value="${tor.nr_startowy || ''}" style="width:80px;"></td>
+                <td class="zawodnik-info" data-tor="${tor.numer}">${imie} ${nazwisko}</td>
+                <td class="rocznik-cell" data-tor="${tor.numer}">${rocznik || '-'}</td>
+                <td class="kategoria-cell" data-tor="${tor.numer}">${kategoriaZaw || '-'}</td>
+                <td><input type="text" class="czas-meta-input" data-tor="${tor.numer}" value="${czasNaMecie}" placeholder="HH:MM:SS.mmm" style="width:130px;"></td>
+                <td class="czas-biegu-cell" data-tor="${tor.numer}">
+                    <input type="text" class="reczny-czas-input" data-tor="${tor.numer}" value="${recznyCzasBiegu || czasBiegu.formatted}" placeholder="MM:SS.mmm" style="width:100px;">
+                </td>
+                <td><select class="status-select" data-tor="${tor.numer}">
+                    <option value="" ${status === '' ? 'selected' : ''}>-- Brak --</option>
+                    <option value="PK" ${status === 'PK' ? 'selected' : ''}>PK</option>
+                    <option value="DNF" ${status === 'DNF' ? 'selected' : ''}>DNF</option>
+                    <option value="DNS" ${status === 'DNS' ? 'selected' : ''}>DNS</option>
+                    <option value="DQ" ${status === 'DQ' ? 'selected' : ''}>DQ</option>
+                </select></td>
+                <td><input type="text" class="miejsce-input" data-tor="${tor.numer}" value="${miejsce}" placeholder="#" style="width:60px;"></td>
+            </tr>`;
+        }
+        html += `</tbody></table>`;
+        document.getElementById('resultsEditor').innerHTML = html;
+        document.getElementById('editPanel').style.display = 'block';
+        
+        document.querySelectorAll('.nr-startowy-input').forEach(input => {
+            input.addEventListener('change', async (e) => {
+                const tor = e.target.getAttribute('data-tor');
+                const nrStartowy = e.target.value.trim();
+                const row = e.target.closest('tr');
+                const zawodnikInfo = row.querySelector('.zawodnik-info');
+                const rocznikCell = row.querySelector('.rocznik-cell');
+                const kategoriaCell = row.querySelector('.kategoria-cell');
+                
+                if (!nrStartowy) {
+                    zawodnikInfo.innerText = '';
+                    rocznikCell.innerText = '-';
+                    kategoriaCell.innerText = '-';
+                    return;
+                }
+                let znaleziony = null;
+                for (const [id, z] of Object.entries(zawodnicyData)) {
+                    if (z.nr_startowy === nrStartowy || z.id === nrStartowy) {
+                        znaleziony = z;
+                        break;
+                    }
+                }
+                if (znaleziony) {
+                    zawodnikInfo.innerText = `${znaleziony.imie || ''} ${znaleziony.nazwisko || ''}`;
+                    rocznikCell.innerText = znaleziony.rocznik || '-';
+                    kategoriaCell.innerText = znaleziony.pelna_kategoria || znaleziony.kategoria_wiekowa || '-';
+                    if (!currentProtocol.tory[tor-1].zawodnik) currentProtocol.tory[tor-1].zawodnik = {};
+                    currentProtocol.tory[tor-1].zawodnik.imie = znaleziony.imie;
+                    currentProtocol.tory[tor-1].zawodnik.nazwisko = znaleziony.nazwisko;
+                    currentProtocol.tory[tor-1].zawodnik.rocznik = znaleziony.rocznik;
+                    currentProtocol.tory[tor-1].zawodnik.pelna_kategoria = znaleziony.pelna_kategoria || znaleziony.kategoria_wiekowa;
+                    currentProtocol.tory[tor-1].nr_startowy = nrStartowy;
+                    addLog(`✅ Wczytano: ${znaleziony.imie} ${znaleziony.nazwisko}`, 'success');
+                } else {
+                    zawodnikInfo.innerText = '';
+                    rocznikCell.innerText = '-';
+                    kategoriaCell.innerText = '-';
+                    addLog(`⚠️ Nie znaleziono zawodnika z numerem ${nrStartowy}`, 'warning');
+                }
+            });
+        });
+        
+        const globalBtn = document.getElementById('globalRecalcBtn');
+        if (globalBtn) {
+            const newBtn = globalBtn.cloneNode(true);
+            globalBtn.parentNode.replaceChild(newBtn, globalBtn);
+            newBtn.addEventListener('click', () => {
+                const czasMetaInputs = document.querySelectorAll('.czas-meta-input');
+                czasMetaInputs.forEach(input => {
+                    const tor = input.getAttribute('data-tor');
+                    const recznyInput = document.querySelector(`.reczny-czas-input[data-tor="${tor}"]`);
+                    if (recznyInput) {
+                        const czasBiegu = obliczCzasBiegu(protocol.czas_startu, input.value);
+                        recznyInput.value = czasBiegu.formatted;
+                    }
+                });
+                addLog('✅ Przeliczono wszystkie czasy', 'success');
+            });
+        }
+        
+        document.getElementById('saveResultsBtn').onclick = () => saveResults(protocolId);
+        document.getElementById('deleteProtocolBtn').onclick = () => deleteProtocol(protocolId);
+    }
+    
+    async function saveResults(protocolId) {
+        if (!currentUser) { addLog('❌ Musisz być zalogowany!', 'error'); return; }
+        const tory = currentProtocol.tory || [];
+        const newResults = [];
+        for (let i = 0; i < tory.length; i++) {
+            const tor = tory[i];
+            const czasNaMecie = document.querySelector(`.czas-meta-input[data-tor="${tor.numer}"]`)?.value || '';
+            const recznyCzasInput = document.querySelector(`.reczny-czas-input[data-tor="${tor.numer}"]`);
+            const recznyCzas = recznyCzasInput ? recznyCzasInput.value : '';
+            const status = document.querySelector(`.status-select[data-tor="${tor.numer}"]`)?.value || null;
+            const miejsce = document.querySelector(`.miejsce-input[data-tor="${tor.numer}"]`)?.value || null;
+            
+            let czasBieguFormat = recznyCzas;
+            let czasBieguSekundy = null;
+            
+            if (recznyCzas && recznyCzas.trim() !== '') {
+                const parts = recznyCzas.split(':');
+                if (parts.length === 2) {
+                    const mins = parseInt(parts[0]);
+                    const secs = parseFloat(parts[1]);
+                    if (!isNaN(mins) && !isNaN(secs)) {
+                        czasBieguSekundy = mins * 60 + secs;
+                        czasBieguFormat = recznyCzas;
+                    }
+                }
+            } else if (czasNaMecie && currentProtocol.czas_startu) {
+                const obliczony = obliczCzasBiegu(currentProtocol.czas_startu, czasNaMecie);
+                czasBieguFormat = obliczony.formatted;
+                czasBieguSekundy = obliczony.seconds;
+            }
+            
+            newResults.push({
+                czas_na_mecie: czasNaMecie || null,
+                reczny_czas_biegu: recznyCzas || null,
+                status,
+                miejsce: miejsce || null,
+                czas_biegu_format: czasBieguFormat,
+                czas_biegu_sekundy: czasBieguSekundy
+            });
+        }
+        try {
+            await database.ref(`protokoly/${protocolId}/wyniki`).set(newResults);
+            addLog('✅ Wyniki zapisane!', 'success');
+            showMessagePanel('✅ Wyniki zapisane!', 'success');
+        } catch (err) { addLog(`❌ Błąd: ${err.message}`, 'error'); }
+    }
+    
+    async function deleteProtocol(protocolId) {
+        if (!confirm('⚠️ Usunąć protokół?')) return;
+        await database.ref(`protokoly/${protocolId}`).remove();
+        addLog('🗑️ Protokół usunięty', 'success');
+        document.getElementById('editPanel').style.display = 'none';
+        loadProtocolsList();
+    }
+    
+    function showMessagePanel(msg, type) {
+        let container = document.getElementById('messages');
+        if (!container) { container = document.createElement('div'); container.id = 'messages'; container.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:1000'; document.body.appendChild(container); }
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type}`;
+        alertDiv.innerHTML = msg;
+        container.appendChild(alertDiv);
+        setTimeout(() => alertDiv.remove(), 4000);
+    }
+
+    // ==================== 9. WYNIKI KOŃCOWE (biegi) ====================
+    function showRankingView(panel) {
+        panel.innerHTML = `<div class="card"><h3>📊 Wyniki końcowe (biegi)</h3><button id="loadRankingBtn" class="info">🔄 Załaduj wszystkie protokoły</button><button id="printRankingBtn" class="success" style="margin-left:10px;">🖨️ Drukuj</button><div id="rankingContainer" style="margin-top:20px;"></div></div>`;
+        document.getElementById('loadRankingBtn').addEventListener('click', loadRanking);
+        document.getElementById('printRankingBtn').addEventListener('click', () => { window.print(); });
+    }
+    
+    async function loadRanking() {
+        const container = document.getElementById('rankingContainer');
+        if (!container) return;
+        container.innerHTML = '<div class="loading">⏳ Ładowanie wyników...</div>';
+        
+        const snapshot = await database.ref('protokoly').once('value');
+        const data = snapshot.val();
+        if (!data || Object.keys(data).length === 0) { 
+            container.innerHTML = '<div class="card">📭 Brak protokołów z wynikami.</div>'; 
+            return; 
+        }
+        
+        const allResults = [];
+        for (const [protocolId, protocol] of Object.entries(data)) {
+            if (!protocol.wyniki || !protocol.tory) continue;
+            const tory = protocol.tory, wyniki = protocol.wyniki;
+            for (let i = 0; i < tory.length && i < wyniki.length; i++) {
+                const tor = tory[i], wynik = wyniki[i], zawodnik = tor.zawodnik || {};
+                allResults.push({
+                    id: zawodnik.id,
+                    nr_startowy: tor.nr_startowy || '',
+                    imie: zawodnik.imie || '',
+                    nazwisko: zawodnik.nazwisko || '',
+                    rocznik: zawodnik.rocznik || '',
+                    kategoria: protocol.kategoria || '',
+                    konkurencja: protocol.konkurencja || '',
+                    numer_biegu: protocol.numer_biegu || '',
+                    tor: tor.numer,
+                    status: wynik.status || null,
+                    miejsce_w_biegu: wynik.miejsce || null,
+                    czas_biegu_format: wynik.czas_biegu_format || '',
+                    czas_biegu_sekundy: wynik.czas_biegu_sekundy || null
+                });
+            }
+        }
+        
+        if (allResults.length === 0) { 
+            container.innerHTML = '<div class="card">📭 Brak wyników.</div>'; 
+            return; 
+        }
+        
+        const nrStartowyCount = {};
+        for (const r of allResults) {
+            if (!r.status || r.status === '') {
+                if (r.nr_startowy) {
+                    nrStartowyCount[r.nr_startowy] = (nrStartowyCount[r.nr_startowy] || 0) + 1;
+                }
+            }
+        }
+        
+        const groups = {};
+        for (const r of allResults) { 
+            const key = `${r.konkurencja}_${r.kategoria}`; 
+            if (!groups[key]) groups[key] = []; 
+            groups[key].push(r); 
+        }
+        
+        let html = '';
+        
+        for (const [key, results] of Object.entries(groups)) {
+            const [konkurencja, kategoria] = key.split('_');
+            
+            const normalni = results.filter(r => !r.status || r.status === '');
+            const pk = results.filter(r => r.status === 'PK');
+            const inni = results.filter(r => r.status && r.status !== 'PK');
+            
+            normalni.sort((a, b) => (a.czas_biegu_sekundy || 999999) - (b.czas_biegu_sekundy || 999999));
+            pk.sort((a, b) => (a.czas_biegu_sekundy || 999999) - (b.czas_biegu_sekundy || 999999));
+            const statusOrder = { 'DNF': 0, 'DQ': 1, 'DNS': 2 };
+            inni.sort((a, b) => {
+                const orderA = statusOrder[a.status] || 3;
+                const orderB = statusOrder[b.status] || 3;
+                if (orderA !== orderB) return orderA - orderB;
+                return (a.czas_biegu_sekundy || 999999) - (b.czas_biegu_sekundy || 999999);
+            });
+            
+            let position = 1;
+            for (const r of normalni) { r.pozycja = position++; }
+            
+            html += `<div class="card" style="margin-top: 20px;"><h3>${konkurencja || '?'} - ${kategoria || '?'}</h3>`;
+            html += `<table class="ranking-table"><thead><tr><th>Poz.</th><th>Nr</th><th>Zawodnik</th><th>Rocznik</th><th>Czas</th><th>Bieg</th><th>Miejsce w biegu</th><th>Status</th></tr></thead><tbody>`;
+            
+            for (const r of normalni) {
+                const isDuplicate = nrStartowyCount[r.nr_startowy] > 2;
+                const nrStyle = isDuplicate ? 'style="background:#fff3cd; font-weight:bold;"' : '';
+                html += `<tr>
+                    <td class="position-cell"><strong>${r.pozycja}</strong></td>
+                    <td ${nrStyle}>${r.nr_startowy || '-'}${isDuplicate ? ' ⚠️' : ''}</td>
+                    <td>${r.imie} ${r.nazwisko}</td>
+                    <td>${r.rocznik || '-'}</td>
+                    <td><strong>${r.czas_biegu_format || '-'}</strong></td>
+                    <td>${r.numer_biegu || '-'}</td>
+                    <td>${r.miejsce_w_biegu || '-'}</td>
+                    <td><span class="status-badge">-</span></td>
+                </tr>`;
+            }
+            for (const r of pk) {
+                html += `<tr>
+                    <td class="position-cell">PK</td>
+                    <td>${r.nr_startowy || '-'}</td>
+                    <td>${r.imie} ${r.nazwisko}</td>
+                    <td>${r.rocznik || '-'}</td>
+                    <td>${r.czas_biegu_format || '-'}</td>
+                    <td>${r.numer_biegu || '-'}</td>
+                    <td>${r.miejsce_w_biegu || '-'}</td>
+                    <td><span class="status-badge status-pk">PK</span></td>
+                </tr>`;
+            }
+            for (const r of inni) {
+                let statusClass = '';
+                if (r.status === 'DNF') statusClass = 'status-dnf';
+                else if (r.status === 'DQ') statusClass = 'status-dq';
+                else if (r.status === 'DNS') statusClass = 'status-dns';
+                html += `<tr>
+                    <td class="position-cell">${r.status}</td>
+                    <td>${r.nr_startowy || '-'}</td>
+                    <td>${r.imie} ${r.nazwisko}</td>
+                    <td>${r.rocznik || '-'}</td>
+                    <td>${r.czas_biegu_format || '-'}</td>
+                    <td>${r.numer_biegu || '-'}</td>
+                    <td>${r.miejsce_w_biegu || '-'}</td>
+                    <td><span class="status-badge ${statusClass}">${r.status}</span></td>
+                </tr>`;
+            }
+            html += `</tbody></table></div>`;
+        }
+        container.innerHTML = html;
+        addLog(`✅ Załadowano ${allResults.length} wyników biegowych`, 'success');
+    }
+
+   // ==================== 10. KONKURENCJE TECHNICZNE ====================
+function showTechnicalView(panel) {
+    panel.innerHTML = `<div class="card"><h3>🏅 Konkurencje techniczne</h3><button id="refreshTechBtn" class="info">🔄 Odśwież</button><button id="printTechBtn" class="success" style="margin-left:10px;">🖨️ Drukuj wyniki</button><div id="techContainer" style="margin-top:20px;"></div></div>`;
+    loadTechnicalResults();
+    document.getElementById('refreshTechBtn').addEventListener('click', loadTechnicalResults);
+    document.getElementById('printTechBtn').addEventListener('click', printTechnicalResults);
+}
+
+async function loadTechnicalResults() {
+    const container = document.getElementById('techContainer');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">⏳ Ładowanie protokołów technicznych...</div>';
+    
+    const snapshot = await database.ref('protokoly_techniczne').once('value');
+    const data = snapshot.val();
+    if (!data || Object.keys(data).length === 0) {
+        container.innerHTML = '<div class="card">📭 Brak protokołów technicznych.</div>';
+        return;
+    }
+    
+    const zawodnicySnap = await database.ref('zawodnicy').once('value');
+    const zawodnicyData = zawodnicySnap.val() || {};
+    
+    // Zbieramy wszystkie wyniki
+    const allTechnical = [];
+    for (const [protocolId, protocol] of Object.entries(data)) {
+        if (!protocol.zawodnicy) continue;
+        const konkurencja = protocol.konkurencja || '?';
+        const kategoria = protocol.kategoria || '?';
+        for (const [nr, zawodnik] of Object.entries(protocol.zawodnicy)) {
+            const pelneDane = zawodnicyData[zawodnik.id] || {};
+            const imie = pelneDane.imie || zawodnik.imie || '';
+            const nazwisko = pelneDane.nazwisko || zawodnik.nazwisko || '';
+            const rocznik = pelneDane.rocznik || zawodnik.rocznik || '';
+            const pelnaKategoria = pelneDane.pelna_kategoria || zawodnik.kategoria || '';
+            const najlepszyRaw = zawodnik.najlepszy;
+            let najlepszy = null;
+            if (najlepszyRaw !== undefined && najlepszyRaw !== null && najlepszyRaw !== '') {
+                najlepszy = parseFloat(najlepszyRaw);
+            }
+            const isPk = zawodnik.pk === true;
+            
+            allTechnical.push({
+                konkurencja, kategoria,
+                nr_startowy: zawodnik.nr_startowy || nr,
+                imie, nazwisko, rocznik, pelna_kategoria: pelnaKategoria,
+                najlepszy, isPk
+            });
+        }
+    }
+    
+    if (allTechnical.length === 0) {
+        container.innerHTML = '<div class="card">📭 Brak wyników w protokołach technicznych.</div>';
+        return;
+    }
+    
+    // Grupowanie po konkurencji i kategorii
+    const groups = {};
+    for (const r of allTechnical) {
+        const key = `${r.konkurencja}_${r.kategoria}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(r);
+    }
+    
+    let html = '';
+    for (const [key, results] of Object.entries(groups)) {
+        const [konkurencja, kategoria] = key.split('_');
+        
+        // Podział na grupy: normalni (nie PK, z wynikiem), PK (z wynikiem), bez wyniku (nie PK i brak wyniku)
+        const normalni = results.filter(r => !r.isPk && r.najlepszy !== null);
+        const pkZWynikiem = results.filter(r => r.isPk && r.najlepszy !== null);
+        const bezWyniku = results.filter(r => !r.isPk && r.najlepszy === null);
+        const pkBezWyniku = results.filter(r => r.isPk && r.najlepszy === null);
+        
+        // Sortowanie malejąco (techniczne)
+        normalni.sort((a, b) => (b.najlepszy || 0) - (a.najlepszy || 0));
+        pkZWynikiem.sort((a, b) => (b.najlepszy || 0) - (a.najlepszy || 0));
+        
+        let position = 1;
+        for (const r of normalni) r.pozycja = position++;
+        for (const r of pkZWynikiem) r.pozycja = null;
+        for (const r of bezWyniku) r.pozycja = null;
+        for (const r of pkBezWyniku) r.pozycja = null;
+        
+        // Generuj unikalny ID dla selecta jednostki
+        const selectId = `unit_${key.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        // Domyślnie jednostka 'm' (można później zmienić przez localStorage)
+        let savedUnit = localStorage.getItem(`unit_${key}`);
+        if (!savedUnit) savedUnit = 'm';
+        
+        html += `<div class="card" style="margin-top:20px;" data-group-key="${key}">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <h3>${konkurencja} - ${kategoria}</h3>
+                <div style="margin: 10px 0;">
+                    <label>Jednostka: </label>
+                    <select class="unit-select" data-group-key="${key}" id="${selectId}">
+                        <option value="m" ${savedUnit === 'm' ? 'selected' : ''}>metry (m)</option>
+                        <option value="cm" ${savedUnit === 'cm' ? 'selected' : ''}>centymetry (cm)</option>
+                    </select>
+                </div>
+            </div>
+            <table class="ranking-table" style="width:100%; border-collapse:collapse;">
+                <thead><tr><th>Poz.</th><th>Nr</th><th>Zawodnik</th><th>Rocznik</th><th>Kategoria</th><th>Wynik</th></tr></thead>
+                <tbody id="tbody_${key.replace(/[^a-zA-Z0-9]/g, '_')}">`;
+        
+        // Funkcja pomocnicza do formatowania wyniku (z jednostką)
+        function formatWynik(wartosc, jednostka) {
+            if (wartosc === null) return '—';
+            if (jednostka === 'cm') return (wartosc).toFixed(0) + ' cm';
+            return wartosc.toFixed(2) + ' m';
+        }
+        
+        // Dodajemy wiersze (później będą aktualizowane po zmianie jednostki)
+        const addRow = (r, isPkFlag) => {
+            let wynikLabel = '';
+            if (isPkFlag) {
+                wynikLabel = r.najlepszy !== null ? formatWynik(r.najlepszy, savedUnit) + ' (PK)' : 'PK';
+            } else {
+                wynikLabel = r.najlepszy !== null ? formatWynik(r.najlepszy, savedUnit) : '—';
+            }
+            let rowClass = '';
+            if (r.pozycja === 1) rowClass = 'position-1';
+            else if (r.pozycja === 2) rowClass = 'position-2';
+            else if (r.pozycja === 3) rowClass = 'position-3';
+            html += `<tr class="${rowClass}" data-wartosc="${r.najlepszy !== null ? r.najlepszy : ''}" data-pk="${isPkFlag}">
+                <td class="position-cell">${r.pozycja !== null ? r.pozycja : (isPkFlag ? 'PK' : '—')}</td>
+                <td>${r.nr_startowy || '-'}</td>
+                <td><strong>${r.imie} ${r.nazwisko}</strong></td>
+                <td>${r.rocznik || '-'}</td>
+                <td>${r.pelna_kategoria || '-'}</td>
+                <td class="wynik-cell">${wynikLabel}</td>
+            </tr>`;
+        };
+        
+        for (const r of normalni) addRow(r, false);
+        for (const r of pkZWynikiem) addRow(r, true);
+        for (const r of bezWyniku) addRow(r, false);
+        for (const r of pkBezWyniku) addRow(r, true);
+        
+        html += `</tbody></table></div>`;
+    }
+    container.innerHTML = html;
+    
+    // Obsługa zmiany jednostki dla każdej grupy
+    document.querySelectorAll('.unit-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+            const groupKey = select.getAttribute('data-group-key');
+            const newUnit = select.value;
+            localStorage.setItem(`unit_${groupKey}`, newUnit);
+            // Odśwież tylko tę grupę (bez przeładowania całej listy)
+            const card = select.closest('.card');
+            const tbody = card.querySelector('tbody');
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const wartosc = row.getAttribute('data-wartosc');
+                const isPk = row.getAttribute('data-pk') === 'true';
+                const wynikCell = row.querySelector('.wynik-cell');
+                if (wartosc && wartosc !== '') {
+                    const num = parseFloat(wartosc);
+                    if (newUnit === 'cm') {
+                        wynikCell.innerText = (num).toFixed(0) + ' cm' + (isPk ? ' (PK)' : '');
+                    } else {
+                        wynikCell.innerText = num.toFixed(2) + ' m' + (isPk ? ' (PK)' : '');
+                    }
+                } else {
+                    if (isPk) wynikCell.innerText = 'PK';
+                    else wynikCell.innerText = '—';
+                }
+            });
+        });
+    });
+    
+    addLog(`✅ Załadowano ${allTechnical.length} wyników technicznych`, 'success');
+}
+
+function printTechnicalResults() {
+    const container = document.getElementById('techContainer');
+    if (!container || !container.innerHTML || container.innerHTML.includes('Ładowanie')) {
+        addLog('❌ Brak wyników do wydrukowania', 'error');
+        return;
+    }
+    const printContent = container.cloneNode(true);
+    // Zastąp selecty etykietą z wybraną jednostką
+    printContent.querySelectorAll('.unit-select').forEach(select => {
+        const selectedText = select.options[select.selectedIndex].text;
+        const parent = select.closest('div');
+        const labelSpan = document.createElement('span');
+        labelSpan.innerHTML = `<strong>Jednostka:</strong> ${selectedText}`;
+        select.replaceWith(labelSpan);
+    });
+    const buttons = printContent.querySelectorAll('button');
+    buttons.forEach(btn => btn.remove());
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+            <head><title>Wyniki konkurencji technicznych</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .card { margin-bottom: 30px; page-break-inside: avoid; }
+                h3 { background: #0a0f2c; color: white; padding: 10px; }
+                .ranking-table { width: 100%; border-collapse: collapse; }
+                .ranking-table th, .ranking-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                .ranking-table th { background: #f0f0f0; }
+                .position-1 { background: #fff9c4; }
+                .position-2 { background: #e8f5e9; }
+                .position-3 { background: #e3f2fd; }
+                .position-cell { text-align: center; width: 50px; }
+                @media print { .no-print { display: none; } }
+            </style>
+            </head>
+            <body>${printContent.innerHTML}</body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+}
+    document.getElementById('loginBtn').addEventListener('click', login);
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => { const view = btn.getAttribute('data-view'); if (view) showView(view); });
+    });
+    document.getElementById('loginEmail').addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
+    document.getElementById('loginPassword').addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
+    
+    setTimeout(() => showView('mappingKonkurencji'), 100);
+    </script>
+</body>
+</html>

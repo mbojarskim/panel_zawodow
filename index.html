@@ -435,31 +435,143 @@
 
     // ==================== 4. PODGLĄD DANYCH ====================
     function showPreviewView(panel) {
-        panel.innerHTML = `<div class="card"><h3>👁️ Podgląd danych z Firebase</h3><button id="refreshPreviewBtn">🔄 Odśwież</button><div id="previewTableContainer" class="table-container"><div class="loading">Ładowanie...</div></div></div>`;
-        loadPreviewData();
-        document.getElementById('refreshPreviewBtn')?.addEventListener('click', loadPreviewData);
-    }
+    panel.innerHTML = `<div class="card">
+        <h3>👁️ Podgląd danych z Firebase</h3>
+        <button id="refreshPreviewBtn" class="info">🔄 Odśwież</button>
+        <div id="statsContainer" style="margin-top: 15px; margin-bottom: 15px; background: #f8f9fa; border-radius: 12px; padding: 15px;">
+            <div class="loading">Ładowanie statystyk...</div>
+        </div>
+        <div id="previewTableContainer" class="table-container">
+            <div class="loading">Ładowanie danych...</div>
+        </div>
+    </div>`;
+    loadPreviewData();
+    document.getElementById('refreshPreviewBtn')?.addEventListener('click', loadPreviewData);
+	}
     function loadPreviewData() {
-        const container = document.getElementById('previewTableContainer');
-        if (!container) return;
-        if (!isFirebaseConnected) { container.innerHTML = '<div class="error-item">⚠️ Brak połączenia</div>'; return; }
-        container.innerHTML = '<div class="loading">⏳ Ładowanie...</div>';
-        database.ref('zawodnicy').once('value').then(snapshot => {
-            const data = snapshot.val();
-            if (!data || Object.keys(data).length === 0) { container.innerHTML = '<div class="card">📭 Brak danych</div>'; return; }
-            const zawodnicy = Object.values(data);
-            let html = '<div style="overflow-x:auto;"><table><thead><tr style="background:#0a0f2c;color:white;">';
-            const columns = ['id', 'imie', 'nazwisko', 'rocznik', 'pelna_kategoria', 'konkurencja1', 'konkurencja2', 'nr_startowy', 'pakiet_odebrany', 'plec', 'rezygnacja', 'email'];
-            columns.forEach(col => html += `<th style="padding:10px;">${col}</th>`);
-            html += '</thead><tbody>';
-            zawodnicy.forEach((z, idx) => { html += `<tr style="background:${idx%2===0?'#f9f9f9':'white'};">`; columns.forEach(col => html += `<td style="padding:8px;">${z[col] || ''}</td>`); html += '</tr>'; });
-            html += '</tbody></table></div>';
-            container.innerHTML = html;
-            addLog(`✅ Wyświetlono ${zawodnicy.length} zawodników`, 'success');
-        }).catch(err => { container.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`; });
+    const container = document.getElementById('previewTableContainer');
+    const statsContainer = document.getElementById('statsContainer');
+    if (!container) return;
+    if (!isFirebaseConnected) {
+        container.innerHTML = '<div class="error-item">⚠️ Brak połączenia z Firebase</div>';
+        if (statsContainer) statsContainer.innerHTML = '<div class="error-item">⚠️ Brak połączenia</div>';
+        return;
     }
+    container.innerHTML = '<div class="loading">⏳ Ładowanie danych...</div>';
+    if (statsContainer) statsContainer.innerHTML = '<div class="loading">⏳ Ładowanie statystyk...</div>';
+    
+    database.ref('zawodnicy').once('value').then(snapshot => {
+        const data = snapshot.val();
+        if (!data || Object.keys(data).length === 0) {
+            container.innerHTML = '<div class="card">📭 Brak danych. Zaimportuj CSV.</div>';
+            if (statsContainer) statsContainer.innerHTML = '<div class="card">📭 Brak danych do statystyk</div>';
+            return;
+        }
+        
+        const zawodnicy = Object.values(data);
+        
+        // ==================== STATYSTYKI ====================
+        // Zbieramy statystyki: konkurencja1 i konkurencja2, z podziałem na kategorie
+        const stats = {};
+        
+        for (const z of zawodnicy) {
+            // Pomijamy zrezygnowanych
+            if (z.rezygnacja === 'TRUE') continue;
+            
+            const kategoria = z.pelna_kategoria || z.kategoria_wiekowa || 'BRAK';
+            
+            // Obsługa konkurencji 1
+            const konk1 = z.konkurencja1;
+            if (konk1 && konk1 !== '') {
+                if (!stats[konk1]) stats[konk1] = {};
+                if (!stats[konk1][kategoria]) stats[konk1][kategoria] = 0;
+                stats[konk1][kategoria]++;
+            }
+            
+            // Obsługa konkurencji 2
+            const konk2 = z.konkurencja2;
+            if (konk2 && konk2 !== '') {
+                if (!stats[konk2]) stats[konk2] = {};
+                if (!stats[konk2][kategoria]) stats[konk2][kategoria] = 0;
+                stats[konk2][kategoria]++;
+            }
+        }
+        
+        // Generowanie HTML statystyk
+        let statsHtml = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">';
+        statsHtml += '<thead><tr style="background: #0a0f2c; color: white;"><th style="padding: 10px;">Konkurencja</th><th style="padding: 10px;">Kategoria</th><th style="padding: 10px; text-align: center;">Liczba zawodników</th></tr></thead><tbody>';
+        
+        // Sortowanie konkurencji alfabetycznie
+        const sortedKonkurencje = Object.keys(stats).sort();
+        for (const konk of sortedKonkurencje) {
+            const kategorie = stats[konk];
+            const sortedKategorie = Object.keys(kategorie).sort();
+            let pierwszyWiersz = true;
+            for (const kat of sortedKategorie) {
+                const liczba = kategorie[kat];
+                statsHtml += `<tr style="border-bottom: 1px solid #ddd;">`;
+                if (pierwszyWiersz) {
+                    statsHtml += `<td style="padding: 8px; font-weight: bold; vertical-align: top;" rowspan="${sortedKategorie.length}">${konk}</td>`;
+                    pierwszyWiersz = false;
+                }
+                statsHtml += `<td style="padding: 8px;">${kat}</td>
+                              <td style="padding: 8px; text-align: center; font-weight: bold;">${liczba}</td>
+                             </tr>`;
+            }
+        }
+        statsHtml += '</tbody></table></div>';
+        
+        if (sortedKonkurencje.length === 0) {
+            statsHtml = '<div class="card">📭 Brak danych do statystyk</div>';
+        }
+        statsContainer.innerHTML = statsHtml;
+        
+        // ==================== TABELA ZAWODNIKÓW ====================
+        const columns = [
+            { key: 'id', label: 'ID' },
+            { key: 'imie', label: 'Imię' },
+            { key: 'nazwisko', label: 'Nazwisko' },
+            { key: 'rocznik', label: 'Rocznik' },
+            { key: 'pelna_kategoria', label: 'Kategoria' },
+            { key: 'konkurencja1', label: 'Konkurencja 1' },
+            { key: 'konkurencja2', label: 'Konkurencja 2' },
+            { key: 'nr_startowy', label: 'Nr startowy' },
+            { key: 'pakiet_odebrany', label: 'Pakiet' },
+            { key: 'plec', label: 'Płeć' },
+            { key: 'rezygnacja', label: 'Rezygnacja' },
+            { key: 'email', label: 'Email' }
+        ];
+        
+        let html = '<div style="overflow-x: auto; max-height: 500px;">';
+        html += '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">';
+        html += '<thead><tr style="background: #0a0f2c; color: white; position: sticky; top: 0;">';
+        columns.forEach(col => {
+            html += `<th style="padding: 10px; border: 1px solid #ddd;">${col.label}</th>`;
+        });
+        html += '</thead><tbody>';
+        
+        zawodnicy.forEach((z, idx) => {
+            const rowBg = idx % 2 === 0 ? '#f9f9f9' : 'white';
+            html += `<tr style="background: ${rowBg};">`;
+            columns.forEach(col => {
+                let value = z[col.key] !== undefined && z[col.key] !== null ? z[col.key] : '';
+                html += `<td style="padding: 8px; border: 1px solid #ddd;">${value}</td>`;
+            });
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+        addLog(`✅ Wyświetlono ${zawodnicy.length} zawodników w tabeli`, 'success');
+        
+    }).catch(err => {
+        container.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`;
+        if (statsContainer) statsContainer.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`;
+        addLog(`❌ Błąd odczytu Firebase: ${err.message}`, 'error');
+    });
+}
 
-    // ==================== 5. GENEROWANIE KODÓW QR ====================
+	// ==================== 5. GENEROWANIE KODÓW QR ====================
     function showQRCodeView(panel) {
         panel.innerHTML = `<div class="card"><h3>🔲 Generowanie kodów QR</h3><div class="instruction-box"><strong>📌 Instrukcja:</strong><br>Program do generowania kodów QR znajduje się pod ścieżką:<br><div class="file-path">D:\\_BIEGI_2026_\\Program\\QR_code\\dist\\QR_Generator.exe</div></div><button id="openQrFolderBtn">📂 Otwórz folder z programem</button></div>`;
         document.getElementById('openQrFolderBtn')?.addEventListener('click', () => { alert('Otwórz ręcznie folder:\nD:\\_BIEGI_2026_\\Program\\QR_code\\dist\\'); addLog('Folder programu QR', 'success'); });

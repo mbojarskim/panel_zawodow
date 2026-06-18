@@ -563,144 +563,369 @@
 			reader.readAsText(file, 'UTF-8');
 		}
 
-		// ==================== 4. PODGLĄD DANYCH ====================
-		function showPreviewView(panel) {
-		panel.innerHTML = `<div class="card">
-			<h3>👁️ Podgląd danych z Firebase</h3>
-			<button id="refreshPreviewBtn" class="info">🔄 Odśwież</button>
-			<div id="statsContainer" style="margin-top: 15px; margin-bottom: 15px; background: #f8f9fa; border-radius: 12px; padding: 15px;">
-				<div class="loading">Ładowanie statystyk...</div>
-			</div>
-			<div id="previewTableContainer" class="table-container">
-				<div class="loading">Ładowanie danych...</div>
-			</div>
-		</div>`;
-		loadPreviewData();
-		document.getElementById('refreshPreviewBtn')?.addEventListener('click', loadPreviewData);
-		}
-		function loadPreviewData() {
-		const container = document.getElementById('previewTableContainer');
-		const statsContainer = document.getElementById('statsContainer');
-		if (!container) return;
-		if (!isFirebaseConnected) {
-			container.innerHTML = '<div class="error-item">⚠️ Brak połączenia z Firebase</div>';
-			if (statsContainer) statsContainer.innerHTML = '<div class="error-item">⚠️ Brak połączenia</div>';
-			return;
-		}
-		container.innerHTML = '<div class="loading">⏳ Ładowanie danych...</div>';
-		if (statsContainer) statsContainer.innerHTML = '<div class="loading">⏳ Ładowanie statystyk...</div>';
-		
-		database.ref('zawodnicy').once('value').then(snapshot => {
-			const data = snapshot.val();
-			if (!data || Object.keys(data).length === 0) {
-				container.innerHTML = '<div class="card">📭 Brak danych. Zaimportuj CSV.</div>';
-				if (statsContainer) statsContainer.innerHTML = '<div class="card">📭 Brak danych do statystyk</div>';
-				return;
-			}
-			
-			const zawodnicy = Object.values(data);
-			
-			// ==================== STATYSTYKI ====================
-			// Zbieramy statystyki: konkurencja1 i konkurencja2, z podziałem na kategorie
-			const stats = {};
-			
-			for (const z of zawodnicy) {
-				// Pomijamy zrezygnowanych
-				if (z.rezygnacja === 'TRUE') continue;
-				
-				const kategoria = z.pelna_kategoria || z.kategoria_wiekowa || 'BRAK';
-				
-				// Obsługa konkurencji 1
-				const konk1 = z.konkurencja1;
-				if (konk1 && konk1 !== '') {
-					if (!stats[konk1]) stats[konk1] = {};
-					if (!stats[konk1][kategoria]) stats[konk1][kategoria] = 0;
-					stats[konk1][kategoria]++;
-				}
-				
-				// Obsługa konkurencji 2
-				const konk2 = z.konkurencja2;
-				if (konk2 && konk2 !== '') {
-					if (!stats[konk2]) stats[konk2] = {};
-					if (!stats[konk2][kategoria]) stats[konk2][kategoria] = 0;
-					stats[konk2][kategoria]++;
-				}
-			}
-			
-			// Generowanie HTML statystyk
-			let statsHtml = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">';
-			statsHtml += '<thead><tr style="background: #0a0f2c; color: white;"><th style="padding: 10px;">Konkurencja</th><th style="padding: 10px;">Kategoria</th><th style="padding: 10px; text-align: center;">Liczba zawodników</th></tr></thead><tbody>';
-			
-			// Sortowanie konkurencji alfabetycznie
-			const sortedKonkurencje = Object.keys(stats).sort();
-			for (const konk of sortedKonkurencje) {
-				const kategorie = stats[konk];
-				const sortedKategorie = Object.keys(kategorie).sort();
-				let pierwszyWiersz = true;
-				for (const kat of sortedKategorie) {
-					const liczba = kategorie[kat];
-					statsHtml += `<tr style="border-bottom: 1px solid #ddd;">`;
-					if (pierwszyWiersz) {
-						statsHtml += `<td style="padding: 8px; font-weight: bold; vertical-align: top;" rowspan="${sortedKategorie.length}">${konk}</td>`;
-						pierwszyWiersz = false;
-					}
-					statsHtml += `<td style="padding: 8px;">${kat}</td>
-								  <td style="padding: 8px; text-align: center; font-weight: bold;">${liczba}</td>
-								 </tr>`;
-				}
-			}
-			statsHtml += '</tbody></table></div>';
-			
-			if (sortedKonkurencje.length === 0) {
-				statsHtml = '<div class="card">📭 Brak danych do statystyk</div>';
-			}
-			statsContainer.innerHTML = statsHtml;
-			
-			// ==================== TABELA ZAWODNIKÓW ====================
-			const columns = [
-				{ key: 'id', label: 'ID' },
-				{ key: 'imie', label: 'Imię' },
-				{ key: 'nazwisko', label: 'Nazwisko' },
-				{ key: 'rocznik', label: 'Rocznik' },
-				{ key: 'pelna_kategoria', label: 'Kategoria' },
-				{ key: 'konkurencja1', label: 'Konkurencja 1' },
-				{ key: 'konkurencja2', label: 'Konkurencja 2' },
-				{ key: 'nr_startowy', label: 'Nr startowy' },
-				{ key: 'pakiet_odebrany', label: 'Pakiet' },
-				{ key: 'plec', label: 'Płeć' },
-				{ key: 'rezygnacja', label: 'Rezygnacja' },
-				{ key: 'email', label: 'Email' }
-			];
-			
-			let html = '<div style="overflow-x: auto; max-height: 500px;">';
-			html += '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">';
-			html += '<thead><tr style="background: #0a0f2c; color: white; position: sticky; top: 0;">';
-			columns.forEach(col => {
-				html += `<th style="padding: 10px; border: 1px solid #ddd;">${col.label}</th>`;
-			});
-			html += '</thead><tbody>';
-			
-			zawodnicy.forEach((z, idx) => {
-				const rowBg = idx % 2 === 0 ? '#f9f9f9' : 'white';
-				html += `<tr style="background: ${rowBg};">`;
-				columns.forEach(col => {
-					let value = z[col.key] !== undefined && z[col.key] !== null ? z[col.key] : '';
-					html += `<td style="padding: 8px; border: 1px solid #ddd;">${value}</td>`;
-				});
-				html += '</tr>';
-			});
-			
-			html += '</tbody></table></div>';
-			container.innerHTML = html;
-			addLog(`✅ Wyświetlono ${zawodnicy.length} zawodników w tabeli`, 'success');
-			
-		}).catch(err => {
-			container.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`;
-			if (statsContainer) statsContainer.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`;
-			addLog(`❌ Błąd odczytu Firebase: ${err.message}`, 'error');
-		});
-	}
+// ==================== 4. PODGLĄD DANYCH ====================
+function showPreviewView(panel) {
+    panel.innerHTML = `<div class="card">
+        <h3>👁️ Podgląd danych z Firebase</h3>
+        <button id="refreshPreviewBtn" class="info">🔄 Odśwież</button>
+        <div id="statsContainer" style="margin-top: 15px; margin-bottom: 15px; background: #f8f9fa; border-radius: 12px; padding: 15px;">
+            <div class="loading">Ładowanie statystyk...</div>
+        </div>
+        <div id="previewTableContainer" class="table-container">
+            <div class="loading">Ładowanie danych...</div>
+        </div>
+    </div>`;
+    loadPreviewData();
+    document.getElementById('refreshPreviewBtn')?.addEventListener('click', refreshPreviewData);
+}
 
+// Przechowuj dane w pamięci, aby nie odświeżać przy zmianie limitu
+let cachedStatsData = null;
+let cachedLimityData = null;
+let cachedZawodnicy = null;
+
+async function loadPreviewData() {
+    const container = document.getElementById('previewTableContainer');
+    const statsContainer = document.getElementById('statsContainer');
+    if (!container) return;
+    if (!isFirebaseConnected) {
+        container.innerHTML = '<div class="error-item">⚠️ Brak połączenia z Firebase</div>';
+        if (statsContainer) statsContainer.innerHTML = '<div class="error-item">⚠️ Brak połączenia</div>';
+        return;
+    }
+    
+    // Pokaż loading tylko przy pierwszym ładowaniu lub ręcznym odświeżeniu
+    if (!cachedStatsData) {
+        container.innerHTML = '<div class="loading">⏳ Ładowanie danych...</div>';
+        if (statsContainer) statsContainer.innerHTML = '<div class="loading">⏳ Ładowanie statystyk...</div>';
+    }
+    
+    try {
+        // Pobierz dane tylko jeśli nie są w cache
+        if (!cachedStatsData) {
+            // Pobierz również zakazane konkurencje
+            const [snapshotZawodnicy, snapshotLimity, snapshotZakazane] = await Promise.all([
+                database.ref('zawodnicy').once('value'),
+                database.ref('limity_konkurencji').once('value'),
+                database.ref('zakazane_konkurencje').once('value')
+            ]);
+
+            const data = snapshotZawodnicy.val();
+            cachedLimityData = snapshotLimity.val() || {};
+            cachedZakazaneData = snapshotZakazane.val() || {};
+            
+            if (!data || Object.keys(data).length === 0) {
+                container.innerHTML = '<div class="card">📭 Brak danych. Zaimportuj CSV.</div>';
+                if (statsContainer) statsContainer.innerHTML = '<div class="card">📭 Brak danych do statystyk</div>';
+                return;
+            }
+            
+            cachedZawodnicy = Object.values(data);
+            
+            // ==================== STATYSTYKI ====================
+            const stats = {};
+            for (const z of cachedZawodnicy) {
+                if (z.rezygnacja === 'TRUE') continue;
+                const kategoria = z.pelna_kategoria || z.kategoria_wiekowa || 'BRAK';
+                
+                const konk1 = z.konkurencja1;
+                if (konk1 && konk1 !== '') {
+                    const key = `${konk1}|${kategoria}`;
+                    if (!stats[key]) stats[key] = 0;
+                    stats[key]++;
+                }
+                
+                const konk2 = z.konkurencja2;
+                if (konk2 && konk2 !== '') {
+                    const key = `${konk2}|${kategoria}`;
+                    if (!stats[key]) stats[key] = 0;
+                    stats[key]++;
+                }
+            }
+            cachedStatsData = stats;
+        }
+        
+        // Renderuj tabelę (używając cached danych)
+        renderStatsTable(statsContainer, cachedStatsData, cachedLimityData, cachedZakazaneData);
+        
+        // ==================== TABELA ZAWODNIKÓW ====================
+        renderZawodnicyTable(container);
+        
+        addLog(`✅ Wyświetlono ${cachedZawodnicy.length} zawodników`, 'success');
+        
+    } catch (err) {
+        console.error('❌ Błąd w loadPreviewData:', err);
+        container.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`;
+        if (statsContainer) statsContainer.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`;
+        addLog(`❌ Błąd odczytu Firebase: ${err.message}`, 'error');
+    }
+}
+
+// Funkcja do ręcznego odświeżenia (czyści cache)
+function refreshPreviewData() {
+    cachedStatsData = null;
+    cachedLimityData = null;
+    cachedZawodnicy = null;
+    cachedZakazaneData = null;
+    loadPreviewData();
+    addLog('🔄 Odświeżono dane', 'success');
+}
+
+// Przechowuj zakazane dane w cache
+let cachedZakazaneData = null;
+
+function renderStatsTable(statsContainer, stats, limityData, zakazaneData) {
+    const sortedKeys = Object.keys(stats).sort();
+    
+    if (sortedKeys.length === 0) {
+        statsContainer.innerHTML = '<div class="card">📭 Brak danych do statystyk</div>';
+        return;
+    }
+    
+    // Funkcja do sprawdzania czy konkurencja jest zakazana dla danej kategorii
+    function isZakazane(konkurencja, kategoria) {
+        if (!zakazaneData || Object.keys(zakazaneData).length === 0) return false;
+        
+        // Szukamy dokładnego dopasowania kategorii
+        for (const [kat, zakazaneList] of Object.entries(zakazaneData)) {
+            if (kat === kategoria && Array.isArray(zakazaneList)) {
+                return zakazaneList.includes(konkurencja);
+            }
+        }
+        
+        // Szukamy częściowego dopasowania
+        for (const [kat, zakazaneList] of Object.entries(zakazaneData)) {
+            if (kategoria.includes(kat) || kat.includes(kategoria)) {
+                if (Array.isArray(zakazaneList) && zakazaneList.includes(konkurencja)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    let statsHtml = `
+    <div style="overflow-x: auto; margin-bottom: 20px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; border: 1px solid #ddd;">
+            <thead>
+                <tr style="background: #0a0f2c; color: white;">
+                    <th style="padding: 6px 10px; border: 1px solid #ddd; min-width: 120px; font-size: 0.75rem;">🏃 Konkurencja</th>
+                    <th style="padding: 6px 10px; border: 1px solid #ddd; min-width: 100px; font-size: 0.75rem;">📋 Kategoria</th>
+                    <th style="padding: 6px 10px; border: 1px solid #ddd; text-align: center; width: 60px; font-size: 0.75rem;">👥 Liczba</th>
+                    <th style="padding: 6px 10px; border: 1px solid #ddd; text-align: center; min-width: 120px; font-size: 0.75rem;">🎯 Limit</th>
+                    <th style="padding: 6px 10px; border: 1px solid #ddd; text-align: center; min-width: 120px; font-size: 0.75rem;">📊 Status</th>
+                </tr>
+            </thead>
+            <tbody>`;
+    
+    for (const key of sortedKeys) {
+        const [konkurencja, kategoria] = key.split('|');
+        const liczba = stats[key];
+        
+        const limitKey = `${konkurencja}|${kategoria}`;
+        let limit = limityData[limitKey] || '';
+        
+        // Sprawdź czy konkurencja jest zakazana dla tej kategorii
+        const czyZakazane = isZakazane(konkurencja, kategoria);
+        
+        // Obliczenie statusu limitu
+        let statusLimit = '';
+        let statusColor = '';
+        let statusEmoji = '';
+        let rowBackground = '';
+        let rowBorder = '';
+        
+        if (czyZakazane) {
+            // Jeśli zakazane - cały wiersz na czerwono
+            rowBackground = 'background: #ffebee !important;';
+            rowBorder = 'border-left: 4px solid #dc3545;';
+            statusLimit = 'ZAKAZANE!';
+            statusColor = 'color: #dc3545; font-weight: bold; background: #ffcdd2;';
+            statusEmoji = '🚫';
+        } else if (limit && !isNaN(limit) && parseInt(limit) > 0) {
+            const limitNum = parseInt(limit);
+            if (liczba > limitNum) {
+                statusLimit = 'PRZEKROCZONY';
+                statusColor = 'color: #dc3545; font-weight: bold; background: #ffebee;';
+                statusEmoji = '🔴';
+            } else if (liczba === limitNum) {
+                statusLimit = 'WYPEŁNIONY';
+                statusColor = 'color: #ff8f00; font-weight: bold; background: #fff3e0;';
+                statusEmoji = '🟡';
+            } else {
+                statusLimit = `WOLNE (${limitNum - liczba})`;
+                statusColor = 'color: #2e7d32; font-weight: bold; background: #e8f5e9;';
+                statusEmoji = '🟢';
+            }
+        } else {
+            statusLimit = 'BRAK LIMITU';
+            statusColor = 'color: #757575; background: #f5f5f5;';
+            statusEmoji = '➖';
+        }
+
+        statsHtml += `
+            <tr style="border-bottom: 1px solid #eee; ${rowBackground} ${rowBorder}" data-key="${key}" data-zakazane="${czyZakazane}">
+                <td style="padding: 4px 8px; font-weight: bold; background: ${czyZakazane ? '#ffcdd2' : '#f8f9fa'}; font-size: 0.8rem;">
+                    ${konkurencja} ${czyZakazane ? '🚫' : ''}
+                </td>
+                <td style="padding: 4px 8px; font-size: 0.8rem; background: ${czyZakazane ? '#ffcdd2' : 'transparent'};">
+                    ${kategoria} ${czyZakazane ? '⚠️' : ''}
+                </td>
+                <td style="padding: 4px 8px; text-align: center; font-weight: bold; background: ${czyZakazane ? '#ffcdd2' : '#f5f5f5'}; font-size: 0.9rem;" class="liczba-cell">${liczba}</td>
+                <td style="padding: 4px 8px; text-align: center; background: ${czyZakazane ? '#ffcdd2' : 'transparent'};">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        <input type="number" 
+                               class="limit-input" 
+                               data-konkurencja="${konkurencja}" 
+                               data-kategoria="${kategoria}"
+                               value="${limit}" 
+                               placeholder="brak"
+                               style="width: 60px; padding: 2px 4px; font-size: 0.75rem; border: ${czyZakazane ? '2px solid #dc3545' : '1px solid #0f3460'}; border-radius: 4px; text-align: center; background: ${czyZakazane ? '#ffcdd2' : 'white'};"
+                               ${czyZakazane ? 'disabled' : ''}>
+                        <span style="font-size: 0.6rem; color: #999;">⏎</span>
+                    </div>
+                    ${czyZakazane ? '<div style="font-size: 0.6rem; color: #dc3545; font-weight: bold; margin-top: 2px;">🚫 ZAKAZANE</div>' : ''}
+                </td>
+                <td style="padding: 4px 8px; text-align: center; ${statusColor} border-radius: 4px; font-size: 0.75rem;" class="status-cell">
+                    ${statusEmoji} ${statusLimit}
+                    ${czyZakazane ? '<br><span style="font-size: 0.6rem; color: #dc3545;">KONKURENCJA ZAKAZANA!</span>' : ''}
+                </td>
+            </tr>`;
+    }
+    
+    statsHtml += `
+            </tbody>
+        </table>
+    </div>`;
+    
+    statsContainer.innerHTML = statsHtml;
+    
+    // ==================== OBSŁUGA ZMIANY LIMITU ====================
+    document.querySelectorAll('.limit-input:not([disabled])').forEach(input => {
+        input.addEventListener('change', async function(e) {
+            const konkurencja = this.getAttribute('data-konkurencja');
+            const kategoria = this.getAttribute('data-kategoria');
+            const limitValue = this.value.trim();
+            const limitKey = `${konkurencja}|${kategoria}`;
+            const row = this.closest('tr');
+            const statusCell = row.querySelector('.status-cell');
+            const liczbaCell = row.querySelector('.liczba-cell');
+            const liczba = parseInt(liczbaCell.textContent) || 0;
+            
+            // Sprawdź czy nie jest zakazane
+            const czyZakazane = row.getAttribute('data-zakazane') === 'true';
+            if (czyZakazane) {
+                addLog('⚠️ Nie można ustawić limitu dla zakazanej konkurencji!', 'warning');
+                return;
+            }
+            
+            console.log(`✏️ Zmiana limitu dla: ${konkurencja} | ${kategoria} -> ${limitValue}`);
+            
+            if (limitValue === '') {
+                try {
+                    await database.ref(`limity_konkurencji/${limitKey}`).remove();
+                    delete cachedLimityData[limitKey];
+                    updateStatusCell(statusCell, liczba, null);
+                    this.value = '';
+                    addLog(`🗑️ Usunięto limit dla ${konkurencja} (${kategoria})`, 'success');
+                } catch (err) {
+                    addLog(`❌ Błąd: ${err.message}`, 'error');
+                }
+            } else if (!isNaN(limitValue) && parseInt(limitValue) >= 0) {
+                const limitNum = parseInt(limitValue);
+                try {
+                    await database.ref(`limity_konkurencji/${limitKey}`).set(limitNum);
+                    cachedLimityData[limitKey] = limitNum;
+                    updateStatusCell(statusCell, liczba, limitNum);
+                    addLog(`✅ Zapisano limit ${limitNum} dla ${konkurencja} (${kategoria})`, 'success');
+                } catch (err) {
+                    addLog(`❌ Błąd: ${err.message}`, 'error');
+                }
+            } else {
+                addLog('⚠️ Wprowadź poprawną liczbę (np. 20)', 'warning');
+                this.value = '';
+            }
+        });
+        
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                this.blur();
+            }
+        });
+        
+        input.title = 'Wpisz limit (np. 20) dla tej konkurencji i kategorii';
+    });
+}
+
+function updateStatusCell(statusCell, liczba, limit) {
+    let statusLimit = '';
+    let statusColor = '';
+    let statusEmoji = '';
+    
+    if (limit && !isNaN(limit) && parseInt(limit) > 0) {
+        const limitNum = parseInt(limit);
+        if (liczba > limitNum) {
+            statusLimit = 'PRZEKROCZONY';
+            statusColor = 'color: #dc3545; font-weight: bold; background: #ffebee;';
+            statusEmoji = '🔴';
+        } else if (liczba === limitNum) {
+            statusLimit = 'WYPEŁNIONY';
+            statusColor = 'color: #ff8f00; font-weight: bold; background: #fff3e0;';
+            statusEmoji = '🟡';
+        } else {
+            statusLimit = `WOLNE (${limitNum - liczba})`;
+            statusColor = 'color: #2e7d32; font-weight: bold; background: #e8f5e9;';
+            statusEmoji = '🟢';
+        }
+    } else {
+        statusLimit = 'BRAK LIMITU';
+        statusColor = 'color: #757575; background: #f5f5f5;';
+        statusEmoji = '➖';
+    }
+    
+    statusCell.style.cssText = `padding: 4px 8px; text-align: center; ${statusColor} border-radius: 4px; font-size: 0.75rem;`;
+    statusCell.innerHTML = `${statusEmoji} ${statusLimit}`;
+}
+
+function renderZawodnicyTable(container) {
+    const columns = [
+        { key: 'id', label: 'ID' },
+        { key: 'imie', label: 'Imię' },
+        { key: 'nazwisko', label: 'Nazwisko' },
+        { key: 'rocznik', label: 'Rocznik' },
+        { key: 'pelna_kategoria', label: 'Kategoria' },
+        { key: 'konkurencja1', label: 'Konkurencja 1' },
+        { key: 'konkurencja2', label: 'Konkurencja 2' },
+        { key: 'nr_startowy', label: 'Nr startowy' },
+        { key: 'pakiet_odebrany', label: 'Pakiet' },
+        { key: 'plec', label: 'Płeć' },
+        { key: 'rezygnacja', label: 'Rezygnacja' },
+        { key: 'email', label: 'Email' }
+    ];
+    
+    let html = '<div style="overflow-x: auto; max-height: 500px; margin-top: 20px; border-top: 2px solid #ddd; padding-top: 20px;">';
+    html += '<h4 style="margin: 10px 0;">📋 Lista zawodników</h4>';
+    html += '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">';
+    html += '<thead><tr style="background: #0a0f2c; color: white; position: sticky; top: 0;">';
+    columns.forEach(col => {
+        html += `<th style="padding: 10px; border: 1px solid #ddd;">${col.label}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    cachedZawodnicy.forEach((z, idx) => {
+        const rowBg = idx % 2 === 0 ? '#f9f9f9' : 'white';
+        html += `<tr style="background: ${rowBg};">`;
+        columns.forEach(col => {
+            let value = z[col.key] !== undefined && z[col.key] !== null ? z[col.key] : '';
+            html += `<td style="padding: 8px; border: 1px solid #ddd;">${value}</td>`;
+        });
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
 		// ==================== 5. GENEROWANIE KODÓW QR ====================
 		function showQRCodeView(panel) {
 			panel.innerHTML = `<div class="card"><h3>🔲 Generowanie kodów QR</h3><div class="instruction-box"><strong>📌 Instrukcja:</strong><br>Program do generowania kodów QR znajduje się pod ścieżką:<br><div class="file-path">D:\\_BIEGI_2026_\\Program\\QR_code\\dist\\QR_Generator.exe</div></div><button id="openQrFolderBtn">📂 Otwórz folder z programem</button></div>`;
@@ -1220,179 +1445,238 @@
 	}
 	   
 	   // ==================== 10. KONKURENCJE TECHNICZNE ====================
-	function showTechnicalView(panel) {
-		panel.innerHTML = `<div class="card"><h3>🏅 Konkurencje techniczne</h3><button id="refreshTechBtn" class="info">🔄 Odśwież</button><button id="printTechBtn" class="success" style="margin-left:10px;">🖨️ Drukuj wyniki</button><div id="techContainer" style="margin-top:20px;"></div></div>`;
-		loadTechnicalResults();
-		document.getElementById('refreshTechBtn').addEventListener('click', loadTechnicalResults);
-		document.getElementById('printTechBtn').addEventListener('click', printTechnicalResults);
-	}
+function showTechnicalView(panel) {
+    panel.innerHTML = `<div class="card"><h3>🏅 Konkurencje techniczne</h3><button id="refreshTechBtn" class="info">🔄 Odśwież</button><button id="printTechBtn" class="success" style="margin-left:10px;">🖨️ Drukuj wyniki</button><div id="techContainer" style="margin-top:20px;"></div></div>`;
+    loadTechnicalResults();
+    document.getElementById('refreshTechBtn').addEventListener('click', loadTechnicalResults);
+    document.getElementById('printTechBtn').addEventListener('click', printTechnicalResults);
+}
 
-	async function loadTechnicalResults() {
-		const container = document.getElementById('techContainer');
-		if (!container) return;
-		container.innerHTML = '<div class="loading">⏳ Ładowanie protokołów technicznych...</div>';
-		
-		const snapshot = await database.ref('protokoly_techniczne').once('value');
-		const data = snapshot.val();
-		if (!data || Object.keys(data).length === 0) {
-			container.innerHTML = '<div class="card">📭 Brak protokołów technicznych.</div>';
-			return;
-		}
-		
-		const zawodnicySnap = await database.ref('zawodnicy').once('value');
-		const zawodnicyData = zawodnicySnap.val() || {};
-		
-		// Zbieramy wszystkie wyniki
-		const allTechnical = [];
-		for (const [protocolId, protocol] of Object.entries(data)) {
-			if (!protocol.zawodnicy) continue;
-			const konkurencja = protocol.konkurencja || '?';
-			const kategoria = protocol.kategoria || '?';
-			for (const [nr, zawodnik] of Object.entries(protocol.zawodnicy)) {
-				const pelneDane = zawodnicyData[zawodnik.id] || {};
-				const imie = pelneDane.imie || zawodnik.imie || '';
-				const nazwisko = pelneDane.nazwisko || zawodnik.nazwisko || '';
-				const rocznik = pelneDane.rocznik || zawodnik.rocznik || '';
-				const pelnaKategoria = pelneDane.pelna_kategoria || zawodnik.kategoria || '';
-				const najlepszyRaw = zawodnik.najlepszy;
-				let najlepszy = null;
-				if (najlepszyRaw !== undefined && najlepszyRaw !== null && najlepszyRaw !== '') {
-					najlepszy = parseFloat(najlepszyRaw);
-				}
-				const isPk = zawodnik.pk === true;
-				
-				allTechnical.push({
-					konkurencja, kategoria,
-					nr_startowy: zawodnik.nr_startowy || nr,
-					imie, nazwisko, rocznik, pelna_kategoria: pelnaKategoria,
-					najlepszy, isPk
-				});
-			}
-		}
-		
-		if (allTechnical.length === 0) {
-			container.innerHTML = '<div class="card">📭 Brak wyników w protokołach technicznych.</div>';
-			return;
-		}
-		
-		// Grupowanie po konkurencji i kategorii
-		const groups = {};
-		for (const r of allTechnical) {
-			const key = `${r.konkurencja}_${r.kategoria}`;
-			if (!groups[key]) groups[key] = [];
-			groups[key].push(r);
-		}
-		
-		let html = '';
-		for (const [key, results] of Object.entries(groups)) {
-			const [konkurencja, kategoria] = key.split('_');
-			
-			// Podział na grupy: normalni (nie PK, z wynikiem), PK (z wynikiem), bez wyniku (nie PK i brak wyniku)
-			const normalni = results.filter(r => !r.isPk && r.najlepszy !== null);
-			const pkZWynikiem = results.filter(r => r.isPk && r.najlepszy !== null);
-			const bezWyniku = results.filter(r => !r.isPk && r.najlepszy === null);
-			const pkBezWyniku = results.filter(r => r.isPk && r.najlepszy === null);
-			
-			// Sortowanie malejąco (techniczne)
-			normalni.sort((a, b) => (b.najlepszy || 0) - (a.najlepszy || 0));
-			pkZWynikiem.sort((a, b) => (b.najlepszy || 0) - (a.najlepszy || 0));
-			
-			let position = 1;
-			for (const r of normalni) r.pozycja = position++;
-			for (const r of pkZWynikiem) r.pozycja = null;
-			for (const r of bezWyniku) r.pozycja = null;
-			for (const r of pkBezWyniku) r.pozycja = null;
-			
-			// Generuj unikalny ID dla selecta jednostki
-			const selectId = `unit_${key.replace(/[^a-zA-Z0-9]/g, '_')}`;
-			// Domyślnie jednostka 'm' (można później zmienić przez localStorage)
-			let savedUnit = localStorage.getItem(`unit_${key}`);
-			if (!savedUnit) savedUnit = 'm';
-			
-			html += `<div class="card" style="margin-top:20px;" data-group-key="${key}">
-				<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-					<h3>${konkurencja} - ${kategoria}</h3>
-					<div style="margin: 10px 0;">
-						<label>Jednostka: </label>
-						<select class="unit-select" data-group-key="${key}" id="${selectId}">
-							<option value="m" ${savedUnit === 'm' ? 'selected' : ''}>metry (m)</option>
-							<option value="cm" ${savedUnit === 'cm' ? 'selected' : ''}>centymetry (cm)</option>
-						</select>
-					</div>
-				</div>
-				<table class="ranking-table" style="width:100%; border-collapse:collapse;">
-					<thead><tr><th>Poz.</th><th>Nr</th><th>Zawodnik</th><th>Rocznik</th><th>Kategoria</th><th>Wynik</th></tr></thead>
-					<tbody id="tbody_${key.replace(/[^a-zA-Z0-9]/g, '_')}">`;
-			
-			// Funkcja pomocnicza do formatowania wyniku (z jednostką)
-			function formatWynik(wartosc, jednostka) {
-				if (wartosc === null) return '—';
-				if (jednostka === 'cm') return (wartosc).toFixed(0) + ' cm';
-				return wartosc.toFixed(2) + ' m';
-			}
-			
-			// Dodajemy wiersze (później będą aktualizowane po zmianie jednostki)
-			const addRow = (r, isPkFlag) => {
-				let wynikLabel = '';
-				if (isPkFlag) {
-					wynikLabel = r.najlepszy !== null ? formatWynik(r.najlepszy, savedUnit) + ' (PK)' : 'PK';
-				} else {
-					wynikLabel = r.najlepszy !== null ? formatWynik(r.najlepszy, savedUnit) : '—';
-				}
-				let rowClass = '';
-				if (r.pozycja === 1) rowClass = 'position-1';
-				else if (r.pozycja === 2) rowClass = 'position-2';
-				else if (r.pozycja === 3) rowClass = 'position-3';
-				html += `<tr class="${rowClass}" data-wartosc="${r.najlepszy !== null ? r.najlepszy : ''}" data-pk="${isPkFlag}">
-					<td class="position-cell">${r.pozycja !== null ? r.pozycja : (isPkFlag ? 'PK' : '—')}</td>
-					<td>${r.nr_startowy || '-'}</td>
-					<td><strong>${r.imie} ${r.nazwisko}</strong></td>
-					<td>${r.rocznik || '-'}</td>
-					<td>${r.pelna_kategoria || '-'}</td>
-					<td class="wynik-cell">${wynikLabel}</td>
-				</tr>`;
-			};
-			
-			for (const r of normalni) addRow(r, false);
-			for (const r of pkZWynikiem) addRow(r, true);
-			for (const r of bezWyniku) addRow(r, false);
-			for (const r of pkBezWyniku) addRow(r, true);
-			
-			html += `</tbody></table></div>`;
-		}
-		container.innerHTML = html;
-		
-		// Obsługa zmiany jednostki dla każdej grupy
-		document.querySelectorAll('.unit-select').forEach(select => {
-			select.addEventListener('change', (e) => {
-				const groupKey = select.getAttribute('data-group-key');
-				const newUnit = select.value;
-				localStorage.setItem(`unit_${groupKey}`, newUnit);
-				// Odśwież tylko tę grupę (bez przeładowania całej listy)
-				const card = select.closest('.card');
-				const tbody = card.querySelector('tbody');
-				const rows = tbody.querySelectorAll('tr');
-				rows.forEach(row => {
-					const wartosc = row.getAttribute('data-wartosc');
-					const isPk = row.getAttribute('data-pk') === 'true';
-					const wynikCell = row.querySelector('.wynik-cell');
-					if (wartosc && wartosc !== '') {
-						const num = parseFloat(wartosc);
-						if (newUnit === 'cm') {
-							wynikCell.innerText = (num).toFixed(0) + ' cm' + (isPk ? ' (PK)' : '');
-						} else {
-							wynikCell.innerText = num.toFixed(2) + ' m' + (isPk ? ' (PK)' : '');
-						}
-					} else {
-						if (isPk) wynikCell.innerText = 'PK';
-						else wynikCell.innerText = '—';
-					}
-				});
-			});
-		});
-		
-		addLog(`✅ Załadowano ${allTechnical.length} wyników technicznych`, 'success');
-	}
+async function loadTechnicalResults() {
+    const container = document.getElementById('techContainer');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">⏳ Ładowanie protokołów technicznych...</div>';
+    
+    const snapshot = await database.ref('protokoly_techniczne').once('value');
+    const data = snapshot.val();
+    if (!data || Object.keys(data).length === 0) {
+        container.innerHTML = '<div class="card">📭 Brak protokołów technicznych.</div>';
+        return;
+    }
+    
+    const zawodnicySnap = await database.ref('zawodnicy').once('value');
+    const zawodnicyData = zawodnicySnap.val() || {};
+    
+    // ===== FUNKCJA PORÓWNUJĄCA Z EX AEQUO (z pliku spikera) =====
+    function compareTechnicalResults(a, b) {
+        const diff = (b.najlepszy || 0) - (a.najlepszy || 0);
+        if (diff !== 0) return diff;
+        
+        const probyA = a.wszystkie_proby || [];
+        const probyB = b.wszystkie_proby || [];
+        
+        const maxDlugosc = Math.max(probyA.length, probyB.length);
+        for (let i = 0; i < maxDlugosc; i++) {
+            const valA = probyA[i] || 0;
+            const valB = probyB[i] || 0;
+            if (valB !== valA) {
+                return valB - valA;
+            }
+        }
+        
+        // Całkowity remis - ex aequo
+        return 0;
+    }
+    
+    // Zbieramy wszystkie wyniki
+    const allTechnical = [];
+    for (const [protocolId, protocol] of Object.entries(data)) {
+        if (!protocol.zawodnicy) continue;
+        const konkurencja = protocol.konkurencja || '?';
+        const kategoria = protocol.kategoria || '?';
+        const zakonczone = protocol.zakonczone === true;
+        
+        for (const [nr, zawodnik] of Object.entries(protocol.zawodnicy)) {
+            const pelneDane = zawodnicyData[zawodnik.id] || {};
+            const imie = pelneDane.imie || zawodnik.imie || '';
+            const nazwisko = pelneDane.nazwisko || zawodnik.nazwisko || '';
+            const rocznik = pelneDane.rocznik || zawodnik.rocznik || '';
+            const pelnaKategoria = pelneDane.pelna_kategoria || zawodnik.kategoria || '';
+            
+            const najlepszyRaw = zawodnik.najlepszy;
+            let najlepszy = null;
+            if (najlepszyRaw !== undefined && najlepszyRaw !== null && najlepszyRaw !== '') {
+                najlepszy = parseFloat(najlepszyRaw);
+            }
+            const isPk = zawodnik.pk === true;
+            
+            // ===== ZBIERAMY WSZYSTKIE PRÓBY (do porównywania ex aequo) =====
+            const wszystkieProby = (zawodnik.wyniki || [])
+                .filter(v => v && v !== 'x' && !isNaN(parseFloat(v)))
+                .map(v => parseFloat(v))
+                .sort((a, b) => b - a);
+            
+            allTechnical.push({
+                konkurencja, kategoria,
+                nr_startowy: zawodnik.nr_startowy || nr,
+                imie, nazwisko, rocznik, pelna_kategoria: pelnaKategoria,
+                najlepszy, isPk,
+                wszystkie_proby: wszystkieProby,  // <-- DODANE dla ex aequo
+                protocolId: protocolId,
+                zakonczone: zakonczone
+            });
+        }
+    }
+    
+    if (allTechnical.length === 0) {
+        container.innerHTML = '<div class="card">📭 Brak wyników w protokołach technicznych.</div>';
+        return;
+    }
+    
+    // Grupowanie po konkurencji i kategorii
+    const groups = {};
+    for (const r of allTechnical) {
+        const key = `${r.konkurencja}_${r.kategoria}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(r);
+    }
+    
+    let html = '';
+    for (const [key, results] of Object.entries(groups)) {
+        const [konkurencja, kategoria] = key.split('_');
+        const isZakonczone = results.some(r => r.zakonczone === true);
+        
+        // Podział na grupy: normalni (nie PK) i PK
+        const normalni = results.filter(r => !r.isPk);
+        const pkZWynikiem = results.filter(r => r.isPk && r.najlepszy !== null);
+        const pkBezWyniku = results.filter(r => r.isPk && r.najlepszy === null);
+        
+        // ===== SORTOWANIE Z UWZGLĘDNIENIEM EX AEQUO (z pliku spikera) =====
+        normalni.sort(compareTechnicalResults);
+        pkZWynikiem.sort(compareTechnicalResults);
+        
+        // ===== PRZYZNAWANIE MIEJSC Z EX AEQUO =====
+        let position = 1;
+        let i = 0;
+        while (i < normalni.length) {
+            let j = i;
+            // Znajdź grupę zawodników z identycznymi wynikami
+            while (j < normalni.length - 1 && 
+                   normalni[j].najlepszy === normalni[j+1].najlepszy &&
+                   JSON.stringify(normalni[j].wszystkie_proby || []) === JSON.stringify(normalni[j+1].wszystkie_proby || [])) {
+                j++;
+            }
+            const count = j - i + 1;
+            for (let k = i; k <= j; k++) {
+                normalni[k].pozycja = position;
+                normalni[k].ex_aequo = count > 1;
+            }
+            position += count;
+            i = j + 1;
+        }
+        
+        // PK nie otrzymują pozycji
+        for (const r of pkZWynikiem) r.pozycja = null;
+        for (const r of pkBezWyniku) r.pozycja = null;
+        
+        // Generuj unikalny ID dla selecta jednostki
+        const selectId = `unit_${key.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        let savedUnit = localStorage.getItem(`unit_${key}`);
+        if (!savedUnit) savedUnit = 'm';
+        
+        html += `<div class="card" style="margin-top:20px;" data-group-key="${key}">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <h3>${konkurencja} - ${kategoria} ${isZakonczone ? '🔒' : ''}</h3>
+                <div style="margin: 10px 0;">
+                    <label>Jednostka: </label>
+                    <select class="unit-select" data-group-key="${key}" id="${selectId}">
+                        <option value="m" ${savedUnit === 'm' ? 'selected' : ''}>metry (m)</option>
+                        <option value="cm" ${savedUnit === 'cm' ? 'selected' : ''}>centymetry (cm)</option>
+                    </select>
+                </div>
+            </div>
+            ${isZakonczone ? `<div class="info-note" style="background:#d4edda;">🔒 Konkurencja została zakończona przez sędziego technicznego.</div>` : ''}
+            <table class="ranking-table" style="width:100%; border-collapse:collapse;">
+                <thead><tr><th>Poz.</th><th>Nr</th><th>Zawodnik</th><th>Rocznik</th><th>Kategoria</th><th>Wynik</th></tr></thead>
+                <tbody id="tbody_${key.replace(/[^a-zA-Z0-9]/g, '_')}">`;
+        
+        // Funkcja pomocnicza do formatowania wyniku (z jednostką)
+        function formatWynik(wartosc, jednostka) {
+            if (wartosc === null) return '—';
+            if (jednostka === 'cm') return (wartosc).toFixed(0) + ' cm';
+            return wartosc.toFixed(2) + ' m';
+        }
+        
+        // Dodajemy wiersze
+        const addRow = (r, isPkFlag) => {
+            // ===== Wyświetlanie ex aequo =====
+            let pozycjaDisplay = '';
+            if (r.pozycja !== null) {
+                pozycjaDisplay = r.ex_aequo ? `${r.pozycja}=` : `${r.pozycja}`;
+            } else {
+                pozycjaDisplay = isPkFlag ? 'PK' : '—';
+            }
+            
+            let wynikLabel = '';
+            if (isPkFlag) {
+                wynikLabel = r.najlepszy !== null ? formatWynik(r.najlepszy, savedUnit) + ' (PK)' : 'PK';
+            } else {
+                wynikLabel = r.najlepszy !== null ? formatWynik(r.najlepszy, savedUnit) : '—';
+            }
+            
+            let rowClass = '';
+            if (r.pozycja === 1) rowClass = 'position-1';
+            else if (r.pozycja === 2) rowClass = 'position-2';
+            else if (r.pozycja === 3) rowClass = 'position-3';
+            
+            html += `<tr class="${rowClass}" data-wartosc="${r.najlepszy !== null ? r.najlepszy : ''}" data-pk="${isPkFlag}">
+                <td class="position-cell">${pozycjaDisplay}</td>
+                <td>${r.nr_startowy || '-'}</td>
+                <td><strong>${r.imie} ${r.nazwisko}</strong></td>
+                <td>${r.rocznik || '-'}</td>
+                <td>${r.pelna_kategoria || '-'}</td>
+                <td class="wynik-cell">${wynikLabel}</td>
+            </tr>`;
+        };
+        
+        for (const r of normalni) addRow(r, false);
+        for (const r of pkZWynikiem) addRow(r, true);
+        for (const r of pkBezWyniku) addRow(r, true);
+        
+        html += `</tbody></table></div>`;
+    }
+    container.innerHTML = html;
+    
+    // Obsługa zmiany jednostki dla każdej grupy
+    document.querySelectorAll('.unit-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+            const groupKey = select.getAttribute('data-group-key');
+            const newUnit = select.value;
+            localStorage.setItem(`unit_${groupKey}`, newUnit);
+            const card = select.closest('.card');
+            const tbody = card.querySelector('tbody');
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const wartosc = row.getAttribute('data-wartosc');
+                const isPk = row.getAttribute('data-pk') === 'true';
+                const wynikCell = row.querySelector('.wynik-cell');
+                if (wartosc && wartosc !== '') {
+                    const num = parseFloat(wartosc);
+                    if (newUnit === 'cm') {
+                        wynikCell.innerText = (num).toFixed(0) + ' cm' + (isPk ? ' (PK)' : '');
+                    } else {
+                        wynikCell.innerText = num.toFixed(2) + ' m' + (isPk ? ' (PK)' : '');
+                    }
+                } else {
+                    if (isPk) wynikCell.innerText = 'PK';
+                    else wynikCell.innerText = '—';
+                }
+            });
+        });
+    });
+    
+    addLog(`✅ Załadowano ${allTechnical.length} wyników technicznych`, 'success');
+}
 
 	function printTechnicalResults() {
 		const container = document.getElementById('techContainer');

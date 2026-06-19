@@ -313,6 +313,74 @@
 			}
 		}
 
+	function obliczCzasBiegu(czasStartuStr, czasNaMecieStr) {
+    if (!czasStartuStr || !czasNaMecieStr) return { formatted: '', seconds: null };
+    
+    try {
+        // ============================================================
+        // PARSOWANIE CZASU STARTU (YYYY-MM-DD HH:MM:SS.mmm)
+        // ============================================================
+        const startParts = czasStartuStr.split(' ');
+        const datePart = startParts[0]; // "2026-06-19"
+        const timePart = startParts[1]; // "09:10:19.672"
+        
+        const dateSplit = datePart.split('-');
+        const year = parseInt(dateSplit[0]);
+        const month = parseInt(dateSplit[1]) - 1;
+        const day = parseInt(dateSplit[2]);
+        
+        const timeSplit = timePart.split(':');
+        const hours = parseInt(timeSplit[0]);
+        const minutes = parseInt(timeSplit[1]);
+        const secSplit = timeSplit[2].split('.');
+        const seconds = parseInt(secSplit[0]);
+        const milliseconds = parseInt(secSplit[1] || '0');
+        
+        const startDate = new Date(year, month, day, hours, minutes, seconds, milliseconds);
+        
+        // ============================================================
+        // PARSOWANIE CZASU NA MECIE (HH:MM:SS.mmm)
+        // ============================================================
+        const metaSplit = czasNaMecieStr.split(':');
+        const metaHours = parseInt(metaSplit[0]);
+        const metaMinutes = parseInt(metaSplit[1]);
+        const metaSecSplit = metaSplit[2].split('.');
+        const metaSeconds = parseInt(metaSecSplit[0]);
+        const metaMilliseconds = parseInt(metaSecSplit[1] || '0');
+        
+        // Tworzymy datę na mecie - używamy tej samej daty co start
+        const metaDate = new Date(year, month, day, metaHours, metaMinutes, metaSeconds, metaMilliseconds);
+        
+        // Jeśli czas na mecie jest przed czasem startu (np. start o 09:10, meta o 09:11)
+        // to znaczy że meta jest tego samego dnia, ale później
+        // Jeśli meta jest wcześniej niż start, dodajemy 1 dzień (np. start o 23:50, meta o 00:10)
+        if (metaDate < startDate) {
+            metaDate.setDate(metaDate.getDate() + 1);
+        }
+        
+        // ============================================================
+        // OBLICZANIE RÓŻNICY
+        // ============================================================
+        const diffMs = metaDate - startDate;
+        if (diffMs < 0) return { formatted: '', seconds: null };
+        
+        const totalSeconds = diffMs / 1000;
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = Math.floor(totalSeconds % 60);
+        const ms = Math.floor((totalSeconds % 1) * 1000);
+        
+        const formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+        
+        return { formatted, seconds: totalSeconds };
+        
+    } catch(e) {
+        console.error("Błąd obliczania czasu:", e);
+        return { formatted: '', seconds: null };
+    }
+}
+
+
+
 		// ==================== 1. MAPOWANIE KONKURENCJI ====================
 		function loadMappingKonkurencji() {
 			database.ref('mapowanie_konkurencji').once('value').then(s => { mapowanieKonkurencji = s.val() || {}; if (Object.keys(mapowanieKonkurencji).length === 0) { mapowanieKonkurencji = { "100M - BIEG": "100M", "100M - ELIM": "100M", "BIEG NA 100M": "100M", "400M PRZEZ PŁOTKI": "400M_PP", "1500 M": "1500M", "SKOK W DAL": "SKOK_W_DAL" }; saveMappingKonkurencji(); } });
@@ -958,290 +1026,799 @@ function renderZawodnicyTable(container) {
 		</div>`; 
 	}
 		// ==================== 9. WPROWADŹ DANE Z METY ====================
-		let currentProtocol = null, currentProtocolId = null;
+		// ==================== 9. WPROWADŹ DANE Z METY (Z INTEGRACJĄ PROTOKOŁÓW) ====================
+let currentProtocol = null;
+let currentProtocolId = null;
+let currentProtocolData = null;
 
-		function parseStartDateTime(startTimeStr) {
-			if (!startTimeStr) return null;
-			try {
-				const [datePart, timePart] = startTimeStr.split(' ');
-				const [year, month, day] = datePart.split('-');
-				let hours = 0, minutes = 0, seconds = 0, milliseconds = 0;
-				if (timePart) {
-					const timeParts = timePart.split(':');
-					hours = parseInt(timeParts[0]) || 0;
-					minutes = parseInt(timeParts[1]) || 0;
-					const secParts = (timeParts[2] || '0').split('.');
-					seconds = parseInt(secParts[0]) || 0;
-					milliseconds = parseInt(secParts[1]) || 0;
-				}
-				return new Date(year, month-1, day, hours, minutes, seconds, milliseconds);
-			} catch(e) { return null; }
-		}
-		
-		function parseMetaTime(metaTimeStr, startDate) {
-			if (!metaTimeStr || !startDate) return null;
-			try {
-				const timeParts = metaTimeStr.split(':');
-				let hours = parseInt(timeParts[0]) || 0;
-				let minutes = parseInt(timeParts[1]) || 0;
-				const secParts = (timeParts[2] || '0').split('.');
-				let seconds = parseInt(secParts[0]) || 0;
-				let milliseconds = parseInt(secParts[1]) || 0;
-				const metaDate = new Date(startDate);
-				metaDate.setHours(hours, minutes, seconds, milliseconds);
-				if (metaDate < startDate) metaDate.setDate(metaDate.getDate() + 1);
-				return metaDate;
-			} catch(e) { return null; }
-		}
-		
-		function formatTimeDifference(startDate, metaDate) {
-			if (!startDate || !metaDate) return { formatted: '', seconds: null };
-			const diffMs = metaDate - startDate;
-			if (diffMs < 0) return { formatted: '', seconds: null };
-			const totalSeconds = diffMs / 1000;
-			const minutes = Math.floor(totalSeconds / 60);
-			const seconds = Math.floor(totalSeconds % 60);
-			const milliseconds = Math.floor((totalSeconds % 1) * 1000);
-			const formatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
-			return { formatted, seconds: totalSeconds };
-		}
-		function obliczCzasBiegu(czasStartuStr, czasNaMecieStr) {
-			if (!czasStartuStr || !czasNaMecieStr) return { formatted: '', seconds: null };
-			const startDate = parseStartDateTime(czasStartuStr);
-			if (!startDate) return { formatted: '', seconds: null };
-			const metaDate = parseMetaTime(czasNaMecieStr, startDate);
-			if (!metaDate) return { formatted: '', seconds: null };
-			return formatTimeDifference(startDate, metaDate);
-		}
+// ==================== 9. WPROWADŹ DANE Z METY ====================
 
-		function showResultsView(panel) {
-			panel.innerHTML = `<div class="card"><h3>📋 Protokoły biegowe</h3><button id="refreshProtocolsBtn" class="info">🔄 Odśwież listę</button><div id="protocolsList" style="margin-top:15px;max-height:300px;overflow-y:auto;"></div></div><div id="editPanel" style="display:none;"><div class="card"><h3>✏️ Edycja wyników</h3><div id="protocolInfo"></div><div id="resultsEditor" style="margin-top:15px;overflow-x:auto;"></div><div style="display:flex;gap:10px;margin-top:20px;"><button id="saveResultsBtn" class="success">💾 Zapisz wyniki</button><button id="deleteProtocolBtn" class="danger">🗑️ Usuń protokół</button><button id="closeEditBtn" class="secondary">✖ Zamknij</button></div></div></div>`;
-			loadProtocolsList();
-			document.getElementById('refreshProtocolsBtn').addEventListener('click', () => loadProtocolsList());
-			document.getElementById('closeEditBtn')?.addEventListener('click', () => { document.getElementById('editPanel').style.display = 'none'; });
-		}
-		
-		function loadProtocolsList() {
-			const container = document.getElementById('protocolsList');
-			if (!container) return;
-			if (!isFirebaseConnected) { container.innerHTML = '<div class="error-item">⚠️ Brak połączenia</div>'; return; }
-			container.innerHTML = '<div class="loading">⏳ Ładowanie...</div>';
-			database.ref('protokoly').orderByChild('data_utworzenia').once('value').then(snapshot => {
-				const data = snapshot.val();
-				if (!data || Object.keys(data).length === 0) { container.innerHTML = '<div class="card">📭 Brak protokołów.</div>'; return; }
-				const protocols = Object.entries(data).map(([id, p]) => ({ id, ...p }));
-				protocols.sort((a, b) => new Date(b.data_utworzenia) - new Date(a.data_utworzenia));
-				let html = '';
-				protocols.forEach(p => { html += `<div class="protocol-item" data-id="${p.id}"><div class="protocol-title">${p.konkurencja || '?'} - Bieg ${p.numer_biegu || '?'} (${p.kategoria || '?'})</div><div class="protocol-details">Czas startu: ${p.czas_startu || 'brak'} | Tory: ${p.ilosc_torow || 0}</div></div>`; });
-				container.innerHTML = html;
-				document.querySelectorAll('.protocol-item').forEach(el => { el.addEventListener('click', () => { loadProtocolForEdit(el.getAttribute('data-id')); document.querySelectorAll('.protocol-item').forEach(p => p.classList.remove('selected')); el.classList.add('selected'); }); });
-			}).catch(err => { container.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`; });
-		}
-		
-		async function loadProtocolForEdit(protocolId) {
-			const snapshot = await database.ref(`protokoly/${protocolId}`).once('value');
-			const protocol = snapshot.val();
-			if (!protocol) { addLog('❌ Nie znaleziono protokołu', 'error'); return; }
-			currentProtocol = protocol;
-			currentProtocolId = protocolId;
-			
-			const zawodnicySnap = await database.ref('zawodnicy').once('value');
-			const zawodnicyData = zawodnicySnap.val() || {};
-			
-			function getZawodnikData(nrStartowy) {
-				if (!nrStartowy) return null;
-				for (const [id, z] of Object.entries(zawodnicyData)) {
-					if (z.nr_startowy === nrStartowy || z.id === nrStartowy) return z;
-				}
-				return null;
-			}
-			
-			const kategoriaBiegu = protocol.kategoria || '';
-			document.getElementById('protocolInfo').innerHTML = `<div class="info-note">
-				<strong>${protocol.konkurencja || '?'} - Bieg ${protocol.numer_biegu || '?'}</strong><br>
-				Kategoria biegu: <strong>${kategoriaBiegu}</strong><br>
-				Czas startu: ${protocol.czas_startu || 'nieustalony'} ${protocol.falstart ? '⚠️ FALSTART' : ''}<br>
-				<small>Format czasu na mecie: HH:MM:SS.mmm</small><br>
-				<small>Ręczny czas biegu: MM:SS.mmm (np. 01:23.456)</small>
-				<button id="globalRecalcBtn" class="info" style="margin-left:10px;">🔄 Przelicz wszystkie czasy</button>
-			</div>`;
-			
-			const tory = protocol.tory || [];
-			const wyniki = protocol.wyniki || [];
-			let html = `<table class="results-table"><thead>
-				<th>Tor</th><th>Nr</th><th>Zawodnik</th><th>Rocznik</th><th>Kategoria</th>
-				<th>Czas na mecie</th><th>Czas biegu</th><th>Status</th><th>Miejsce</th>
-			</thead><tbody>`;
-			
-			for (let i = 0; i < tory.length; i++) {
-				const tor = tory[i];
-				const wynik = wyniki[i] || {};
-				const czasNaMecie = wynik.czas_na_mecie || '';
-				const recznyCzasBiegu = wynik.reczny_czas_biegu || '';
-				const status = wynik.status || '';
-				const miejsce = wynik.miejsce || '';
-				
-				const zawodnikData = getZawodnikData(tor.nr_startowy);
-				const imie = zawodnikData?.imie || '';
-				const nazwisko = zawodnikData?.nazwisko || '';
-				const rocznik = zawodnikData?.rocznik || '';
-				const kategoriaZaw = zawodnikData?.pelna_kategoria || zawodnikData?.kategoria_wiekowa || '';
-				
-				let czasBiegu = obliczCzasBiegu(protocol.czas_startu, czasNaMecie);
-				if (recznyCzasBiegu) czasBiegu = { formatted: recznyCzasBiegu, seconds: null };
-				
-				html += `<tr data-tor="${tor.numer}">
-					<td>${tor.numer}</td>
-					<td><input type="text" class="nr-startowy-input" data-tor="${tor.numer}" value="${tor.nr_startowy || ''}" style="width:80px;"></td>
-					<td class="zawodnik-info" data-tor="${tor.numer}">${imie} ${nazwisko}</td>
-					<td class="rocznik-cell" data-tor="${tor.numer}">${rocznik || '-'}</td>
-					<td class="kategoria-cell" data-tor="${tor.numer}">${kategoriaZaw || '-'}</td>
-					<td><input type="text" class="czas-meta-input" data-tor="${tor.numer}" value="${czasNaMecie}" placeholder="HH:MM:SS.mmm" style="width:130px;"></td>
-					<td class="czas-biegu-cell" data-tor="${tor.numer}">
-						<input type="text" class="reczny-czas-input" data-tor="${tor.numer}" value="${recznyCzasBiegu || czasBiegu.formatted}" placeholder="MM:SS.mmm" style="width:100px;">
-					</td>
-					<td><select class="status-select" data-tor="${tor.numer}">
-						<option value="" ${status === '' ? 'selected' : ''}>-- Brak --</option>
-						<option value="PK" ${status === 'PK' ? 'selected' : ''}>PK</option>
-						<option value="DNF" ${status === 'DNF' ? 'selected' : ''}>DNF</option>
-						<option value="DNS" ${status === 'DNS' ? 'selected' : ''}>DNS</option>
-						<option value="DQ" ${status === 'DQ' ? 'selected' : ''}>DQ</option>
-					</select></td>
-					<td><input type="text" class="miejsce-input" data-tor="${tor.numer}" value="${miejsce}" placeholder="#" style="width:60px;"></td>
-				</tr>`;
-			}
-			html += `</tbody></table>`;
-			document.getElementById('resultsEditor').innerHTML = html;
-			document.getElementById('editPanel').style.display = 'block';
-			
-			document.querySelectorAll('.nr-startowy-input').forEach(input => {
-				input.addEventListener('change', async (e) => {
-					const tor = e.target.getAttribute('data-tor');
-					const nrStartowy = e.target.value.trim();
-					const row = e.target.closest('tr');
-					const zawodnikInfo = row.querySelector('.zawodnik-info');
-					const rocznikCell = row.querySelector('.rocznik-cell');
-					const kategoriaCell = row.querySelector('.kategoria-cell');
-					
-					if (!nrStartowy) {
-						zawodnikInfo.innerText = '';
-						rocznikCell.innerText = '-';
-						kategoriaCell.innerText = '-';
-						return;
-					}
-					let znaleziony = null;
-					for (const [id, z] of Object.entries(zawodnicyData)) {
-						if (z.nr_startowy === nrStartowy || z.id === nrStartowy) {
-							znaleziony = z;
-							break;
-						}
-					}
-					if (znaleziony) {
-						zawodnikInfo.innerText = `${znaleziony.imie || ''} ${znaleziony.nazwisko || ''}`;
-						rocznikCell.innerText = znaleziony.rocznik || '-';
-						kategoriaCell.innerText = znaleziony.pelna_kategoria || znaleziony.kategoria_wiekowa || '-';
-						if (!currentProtocol.tory[tor-1].zawodnik) currentProtocol.tory[tor-1].zawodnik = {};
-						currentProtocol.tory[tor-1].zawodnik.imie = znaleziony.imie;
-						currentProtocol.tory[tor-1].zawodnik.nazwisko = znaleziony.nazwisko;
-						currentProtocol.tory[tor-1].zawodnik.rocznik = znaleziony.rocznik;
-						currentProtocol.tory[tor-1].zawodnik.pelna_kategoria = znaleziony.pelna_kategoria || znaleziony.kategoria_wiekowa;
-						currentProtocol.tory[tor-1].nr_startowy = nrStartowy;
-						addLog(`✅ Wczytano: ${znaleziony.imie} ${znaleziony.nazwisko}`, 'success');
-					} else {
-						zawodnikInfo.innerText = '';
-						rocznikCell.innerText = '-';
-						kategoriaCell.innerText = '-';
-						addLog(`⚠️ Nie znaleziono zawodnika z numerem ${nrStartowy}`, 'warning');
-					}
-				});
-			});
-			
-			const globalBtn = document.getElementById('globalRecalcBtn');
-			if (globalBtn) {
-				const newBtn = globalBtn.cloneNode(true);
-				globalBtn.parentNode.replaceChild(newBtn, globalBtn);
-				newBtn.addEventListener('click', () => {
-					const czasMetaInputs = document.querySelectorAll('.czas-meta-input');
-					czasMetaInputs.forEach(input => {
-						const tor = input.getAttribute('data-tor');
-						const recznyInput = document.querySelector(`.reczny-czas-input[data-tor="${tor}"]`);
-						if (recznyInput) {
-							const czasBiegu = obliczCzasBiegu(protocol.czas_startu, input.value);
-							recznyInput.value = czasBiegu.formatted;
-						}
-					});
-					addLog('✅ Przeliczono wszystkie czasy', 'success');
-				});
-			}
-			
-			document.getElementById('saveResultsBtn').onclick = () => saveResults(protocolId);
-			document.getElementById('deleteProtocolBtn').onclick = () => deleteProtocol(protocolId);
-		}
-		
-		async function saveResults(protocolId) {
-			if (!currentUser) { addLog('❌ Musisz być zalogowany!', 'error'); return; }
-			const tory = currentProtocol.tory || [];
-			const newResults = [];
-			for (let i = 0; i < tory.length; i++) {
-				const tor = tory[i];
-				const czasNaMecie = document.querySelector(`.czas-meta-input[data-tor="${tor.numer}"]`)?.value || '';
-				const recznyCzasInput = document.querySelector(`.reczny-czas-input[data-tor="${tor.numer}"]`);
-				const recznyCzas = recznyCzasInput ? recznyCzasInput.value : '';
-				const status = document.querySelector(`.status-select[data-tor="${tor.numer}"]`)?.value || null;
-				const miejsce = document.querySelector(`.miejsce-input[data-tor="${tor.numer}"]`)?.value || null;
-				
-				let czasBieguFormat = recznyCzas;
-				let czasBieguSekundy = null;
-				
-				if (recznyCzas && recznyCzas.trim() !== '') {
-					const parts = recznyCzas.split(':');
-					if (parts.length === 2) {
-						const mins = parseInt(parts[0]);
-						const secs = parseFloat(parts[1]);
-						if (!isNaN(mins) && !isNaN(secs)) {
-							czasBieguSekundy = mins * 60 + secs;
-							czasBieguFormat = recznyCzas;
-						}
-					}
-				} else if (czasNaMecie && currentProtocol.czas_startu) {
-					const obliczony = obliczCzasBiegu(currentProtocol.czas_startu, czasNaMecie);
-					czasBieguFormat = obliczony.formatted;
-					czasBieguSekundy = obliczony.seconds;
-				}
-				
-				newResults.push({
-					czas_na_mecie: czasNaMecie || null,
-					reczny_czas_biegu: recznyCzas || null,
-					status,
-					miejsce: miejsce || null,
-					czas_biegu_format: czasBieguFormat,
-					czas_biegu_sekundy: czasBieguSekundy
-				});
-			}
-			try {
-				await database.ref(`protokoly/${protocolId}/wyniki`).set(newResults);
-				addLog('✅ Wyniki zapisane!', 'success');
-				showMessagePanel('✅ Wyniki zapisane!', 'success');
-			} catch (err) { addLog(`❌ Błąd: ${err.message}`, 'error'); }
-		}
-		
-		async function deleteProtocol(protocolId) {
-			if (!confirm('⚠️ Usunąć protokół?')) return;
-			await database.ref(`protokoly/${protocolId}`).remove();
-			addLog('🗑️ Protokół usunięty', 'success');
-			document.getElementById('editPanel').style.display = 'none';
-			loadProtocolsList();
-		}
-		
-		function showMessagePanel(msg, type) {
-			let container = document.getElementById('messages');
-			if (!container) { container = document.createElement('div'); container.id = 'messages'; container.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:1000'; document.body.appendChild(container); }
-			const alertDiv = document.createElement('div');
-			alertDiv.className = `alert alert-${type}`;
-			alertDiv.innerHTML = msg;
-			container.appendChild(alertDiv);
-			setTimeout(() => alertDiv.remove(), 4000);
-		}
+// ... (tu masz currentProtocol, showResultsView, loadProtocolsList, itp.)
+
+// ============================================================
+// ZAPIS WYNIKÓW DO PROTOKOŁU
+// ============================================================
+async function saveResults(protocolId) {
+    if (!currentUser) {
+        addLog('❌ Musisz być zalogowany!', 'error');
+        return;
+    }
+    
+    if (!currentProtocol || !currentProtocol.tory) {
+        addLog('❌ Brak danych do zapisu!', 'error');
+        return;
+    }
+    
+    try {
+        const tory = currentProtocol.tory || [];
+        const newResults = [];
+        
+        for (let i = 0; i < tory.length; i++) {
+            const tor = tory[i];
+            const torNumer = tor.numer;
+            
+            // Pobierz wartości z pól
+            const czasNaMecie = document.querySelector(`.czas-meta-input[data-tor="${torNumer}"]`)?.value || '';
+            const recznyCzasInput = document.querySelector(`.reczny-czas-input[data-tor="${torNumer}"]`);
+            const recznyCzas = recznyCzasInput ? recznyCzasInput.value : '';
+            const status = document.querySelector(`.status-select[data-tor="${torNumer}"]`)?.value || null;
+            const miejsce = document.querySelector(`.miejsce-input[data-tor="${torNumer}"]`)?.value || null;
+            
+            // Oblicz czas biegu w sekundach
+            let czasBieguFormat = recznyCzas;
+            let czasBieguSekundy = null;
+            
+            if (recznyCzas && recznyCzas.trim() !== '') {
+                // Parsuj MM:SS.mmm
+                const parts = recznyCzas.split(':');
+                if (parts.length === 2) {
+                    const mins = parseInt(parts[0]);
+                    const secs = parseFloat(parts[1]);
+                    if (!isNaN(mins) && !isNaN(secs)) {
+                        czasBieguSekundy = mins * 60 + secs;
+                        czasBieguFormat = recznyCzas;
+                    }
+                }
+            } else if (czasNaMecie && currentProtocol.czas_startu) {
+                const obliczony = obliczCzasBiegu(currentProtocol.czas_startu, czasNaMecie);
+                czasBieguFormat = obliczony.formatted;
+                czasBieguSekundy = obliczony.seconds;
+            }
+            
+            newResults.push({
+                czas_na_mecie: czasNaMecie || null,
+                reczny_czas_biegu: recznyCzas || null,
+                status: status,
+                miejsce: miejsce || null,
+                czas_biegu_format: czasBieguFormat,
+                czas_biegu_sekundy: czasBieguSekundy
+            });
+        }
+        
+        // Zapisz do Firebase
+        await database.ref(`protokoly/${protocolId}/wyniki`).set(newResults);
+        
+        // Zaktualizuj lokalny protokół
+        currentProtocol.wyniki = newResults;
+        
+        addLog(`✅ Wyniki zapisane w protokole ${protocolId}`, 'success');
+        showMessage('✅ Wyniki zapisane pomyślnie!', 'success');
+        
+        // Odśwież listę protokołów
+        await loadProtocolsList();
+        
+    } catch (err) {
+        console.error('Błąd zapisu:', err);
+        addLog(`❌ Błąd zapisu: ${err.message}`, 'error');
+        showMessage(`❌ Błąd zapisu: ${err.message}`, 'error');
+    }
+}
+
+// ============================================================
+// USUWANIE PROTOKOŁU
+// ============================================================
+async function deleteProtocol(protocolId) {
+    if (!confirm(`⚠️ Czy na pewno chcesz usunąć protokół ${protocolId}?`)) {
+        return;
+    }
+    
+    if (!currentUser) {
+        addLog('❌ Musisz być zalogowany!', 'error');
+        return;
+    }
+    
+    try {
+        await database.ref(`protokoly/${protocolId}`).remove();
+        addLog(`🗑️ Protokół ${protocolId} usunięty`, 'success');
+        showMessage('🗑️ Protokół usunięty', 'success');
+        
+        // Zamknij panel edycji
+        document.getElementById('editPanel').style.display = 'none';
+        currentProtocol = null;
+        currentProtocolId = null;
+        currentProtocolData = null;
+        
+        // Odśwież listę
+        await loadProtocolsList();
+        
+    } catch (err) {
+        addLog(`❌ Błąd usuwania: ${err.message}`, 'error');
+        showMessage(`❌ Błąd usuwania: ${err.message}`, 'error');
+    }
+}
+
+// ============================================================
+// FUNKCJA POMOCNICZA - Wyświetlanie komunikatów
+// ============================================================
+function showMessage(msg, type) {
+    const container = document.getElementById('messages');
+    if (!container) {
+        // Jeśli nie ma kontenera, utwórz go
+        const newContainer = document.createElement('div');
+        newContainer.id = 'messages';
+        newContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:1000;';
+        document.body.appendChild(newContainer);
+    }
+    const messagesContainer = document.getElementById('messages');
+    const alertDiv = document.createElement('div');
+    const colors = {
+        success: '#d4edda',
+        error: '#f8d7da',
+        warning: '#fff3cd'
+    };
+    alertDiv.style.cssText = `
+        background: ${colors[type] || '#e7f3ff'};
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-left: 4px solid ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#ffc107'};
+        font-size: 0.9rem;
+    `;
+    alertDiv.innerHTML = msg;
+    messagesContainer.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 4000);
+}
+
+
+function showResultsView(panel) {
+    panel.innerHTML = `
+        <div class="card">
+            <h3>📋 Protokoły biegowe - wprowadzanie wyników z mety</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                <button id="refreshProtocolsBtn" class="info">🔄 Odśwież listę protokołów</button>
+                <button id="loadAllProtocolsBtn" class="info">📥 Załaduj wszystkie protokoły</button>
+                <button id="clearProtocolsBtn" class="danger">🗑️ Wyczyść wybrane</button>
+            </div>
+            <div id="protocolsList" style="max-height: 300px; overflow-y: auto; margin-top: 10px; border: 1px solid #eee; border-radius: 8px; padding: 5px;"></div>
+        </div>
+        <div id="editPanel" style="display: none;">
+            <div class="card">
+                <h3>✏️ Wprowadzanie wyników z mety</h3>
+                <div id="protocolInfo" style="background: #e7f3ff; padding: 12px; border-radius: 8px; margin-bottom: 15px;"></div>
+                <div id="resultsEditor" style="margin-top: 15px; overflow-x: auto;"></div>
+                <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                    <button id="saveResultsBtn" class="success">💾 Zapisz wyniki</button>
+                    <button id="saveAndCloseBtn" class="success">💾 Zapisz i zamknij</button>
+                    <button id="deleteProtocolBtn" class="danger">🗑️ Usuń protokół</button>
+                    <button id="closeEditBtn" class="secondary">✖ Zamknij</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Załaduj protokoły
+    loadProtocolsList();
+    
+    // Event listeners
+    document.getElementById('refreshProtocolsBtn').addEventListener('click', () => loadProtocolsList());
+    document.getElementById('loadAllProtocolsBtn').addEventListener('click', loadAllProtocols);
+    document.getElementById('clearProtocolsBtn').addEventListener('click', clearSelectedProtocols);
+    document.getElementById('closeEditBtn')?.addEventListener('click', () => {
+        document.getElementById('editPanel').style.display = 'none';
+    });
+    document.getElementById('saveAndCloseBtn')?.addEventListener('click', async () => {
+        if (currentProtocolId) {
+            await saveResults(currentProtocolId);
+            document.getElementById('editPanel').style.display = 'none';
+            loadProtocolsList();
+        }
+    });
+}
+
+async function loadAllProtocols() {
+    showMessage('Ładowanie wszystkich protokołów...', 'success');
+    await loadProtocolsList();
+}
+
+function clearSelectedProtocols() {
+    document.querySelectorAll('.protocol-item').forEach(p => p.classList.remove('selected'));
+    document.getElementById('editPanel').style.display = 'none';
+    currentProtocol = null;
+    currentProtocolId = null;
+    currentProtocolData = null;
+    showMessage('Wyczyszczono wybór', 'success');
+}
+
+async function loadProtocolsList() {
+    const container = document.getElementById('protocolsList');
+    if (!container) return;
+    if (!isFirebaseConnected) {
+        container.innerHTML = '<div class="error-item">⚠️ Brak połączenia z Firebase</div>';
+        return;
+    }
+    
+    container.innerHTML = '<div class="loading">⏳ Ładowanie protokołów...</div>';
+    
+    try {
+        const snapshot = await database.ref('protokoly').orderByChild('data_utworzenia').once('value');
+        const data = snapshot.val();
+        
+        if (!data || Object.keys(data).length === 0) {
+            container.innerHTML = '<div class="card">📭 Brak protokołów. Użyj aplikacji "Sędzia Startowy" do utworzenia protokołów.</div>';
+            return;
+        }
+        
+        const protocols = Object.entries(data).map(([id, p]) => ({ id, ...p }));
+        protocols.sort((a, b) => new Date(b.data_utworzenia) - new Date(a.data_utworzenia));
+        
+        let html = '<div style="font-size: 0.85rem;">';
+        protocols.forEach(p => {
+            const hasStart = p.czas_startu ? '✅' : '⏳';
+            const statusClass = p.czas_startu ? 'protocol-item' : 'protocol-item';
+            const falstart = p.falstart ? ' ⚠️ FALSTART' : '';
+            
+            // Liczba zawodników
+            const zawodnicyCount = p.tory ? p.tory.filter(t => t.nr_startowy).length : 0;
+            const wynikiCount = p.wyniki ? p.wyniki.filter(w => w.czas_na_mecie || w.reczny_czas_biegu).length : 0;
+            
+            html += `
+                <div class="${statusClass}" data-id="${p.id}" style="padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; border-left: 4px solid ${p.czas_startu ? '#28a745' : '#ffc107'};">
+                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px;">
+                        <div>
+                            <strong>${p.konkurencja || '?'}</strong> - 
+                            <span style="color: #0f3460;">${p.kategoria || '?'}</span>
+                            <span style="background: #0f3460; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem;">Bieg ${p.numer_biegu || '?'}</span>
+                            ${falstart}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #666;">
+                            ${hasStart} ${p.czas_startu || 'brak startu'} 
+                            | 👥 ${zawodnicyCount}/${p.ilosc_torow || 0} 
+                            | 📊 ${wynikiCount}
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #999; margin-top: 5px;">
+                        ${new Date(p.data_utworzenia).toLocaleString()}
+                        ${p.utworzono_przez ? ` | ${p.utworzono_przez}` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        
+        // Click na protokół
+        document.querySelectorAll('.protocol-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const id = el.getAttribute('data-id');
+                document.querySelectorAll('.protocol-item').forEach(p => p.classList.remove('selected'));
+                el.classList.add('selected');
+                el.style.borderLeftColor = '#0f3460';
+                loadProtocolForEdit(id);
+            });
+        });
+        
+        addLog(`✅ Załadowano ${protocols.length} protokołów`, 'success');
+        
+    } catch (err) {
+        container.innerHTML = `<div class="error-item">❌ Błąd: ${err.message}</div>`;
+        addLog(`❌ Błąd ładowania protokołów: ${err.message}`, 'error');
+    }
+}
+
+async function loadProtocolForEdit(protocolId) {
+    const snapshot = await database.ref(`protokoly/${protocolId}`).once('value');
+    const protocol = snapshot.val();
+    if (!protocol) {
+        addLog('❌ Nie znaleziono protokołu', 'error');
+        return;
+    }
+    
+    currentProtocol = protocol;
+    currentProtocolId = protocolId;
+    currentProtocolData = { ...protocol };
+    
+    // ============================================================
+    // POBRANIE WYNIKÓW Z /wyniki_biegowe/
+    // ============================================================
+    const wynikKey = `${protocol.kategoria.replace(/ /g, '_')}_${protocol.konkurencja.replace(/ /g, '_')}`;
+    
+    let wynikiZFirebase = {};
+    try {
+        const wynikiSnapshot = await database.ref('wyniki_biegowe').once('value');
+        const wszystkieWyniki = wynikiSnapshot.val() || {};
+        
+        // Szukamy wyników dla tej konkurencji
+        const possibleKeys = [
+            wynikKey,
+            `${protocol.konkurencja.replace(/ /g, '_')}_${protocol.kategoria.replace(/ /g, '_')}`,
+            `${protocol.kategoria.replace(/ /g, '_')}_${protocol.konkurencja.replace(/ /g, '_')}`
+        ];
+        
+        for (const key of possibleKeys) {
+            if (wszystkieWyniki[key]) {
+                wynikiZFirebase = wszystkieWyniki[key];
+                addLog(`✅ Znaleziono wyniki dla: ${key}`, 'success');
+                break;
+            }
+        }
+        
+        if (Object.keys(wynikiZFirebase).length === 0) {
+            for (const [key, value] of Object.entries(wszystkieWyniki)) {
+                if (key.includes(protocol.konkurencja.replace(/ /g, '_')) || 
+                    key.includes(protocol.kategoria.replace(/ /g, '_'))) {
+                    wynikiZFirebase = value;
+                    addLog(`✅ Znaleziono wyniki w: ${key}`, 'success');
+                    break;
+                }
+            }
+        }
+    } catch (err) {
+        addLog(`⚠️ Błąd pobierania wyników: ${err.message}`, 'warning');
+    }
+    
+    // ============================================================
+    // MAPOWANIE WYNIKÓW PO NUMERZE STARTOWYM
+    // ============================================================
+    const wynikiMap = {};
+    if (wynikiZFirebase && Object.keys(wynikiZFirebase).length > 0) {
+        for (const [id, wynik] of Object.entries(wynikiZFirebase)) {
+            const nrStartowy = wynik.zawodnik ? String(wynik.zawodnik) : '';
+            if (nrStartowy) {
+                wynikiMap[nrStartowy] = wynik;
+            }
+        }
+        addLog(`✅ Załadowano ${Object.keys(wynikiMap).length} wyników z Firebase`, 'success');
+    }
+    
+    // Pobierz listę zawodników
+    const zawodnicySnap = await database.ref('zawodnicy').once('value');
+    const zawodnicyData = zawodnicySnap.val() || {};
+    
+    function getZawodnikData(nrStartowy) {
+        if (!nrStartowy) return null;
+        for (const [id, z] of Object.entries(zawodnicyData)) {
+            if (z.nr_startowy == nrStartowy || z.id === nrStartowy) return z;
+        }
+        return null;
+    }
+    
+    // Wyświetl informacje o protokole
+    const czasStartu = protocol.czas_startu || 'nieustalony';
+    const falstartInfo = protocol.falstart ? '⚠️ FALSTART' : (protocol.czas_startu ? '✅ prawidłowy' : '⏳ brak startu');
+    
+    document.getElementById('protocolInfo').innerHTML = `
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <strong>${protocol.konkurencja || '?'}</strong> - 
+                <strong>${protocol.kategoria || '?'}</strong>
+                <span style="background: #0f3460; color: white; padding: 2px 12px; border-radius: 12px;">Bieg ${protocol.numer_biegu || '?'}</span>
+                <span style="background: #28a745; color: white; padding: 2px 12px; border-radius: 12px; margin-left: 5px;">📊 ${Object.keys(wynikiMap).length} wyników</span>
+            </div>
+            <div>
+                <span style="font-family: monospace;">🕐 Start: ${czasStartu}</span>
+                <span style="margin-left: 15px; color: ${protocol.falstart ? '#dc3545' : '#28a745'};">${falstartInfo}</span>
+            </div>
+        </div>
+        <div style="margin-top: 8px; font-size: 0.85rem; color: #666;">
+            <small>Format czasu na mecie: HH:MM:SS.mmm | Ręczny czas biegu: MM:SS.mmm</small>
+            <button id="globalRecalcBtn" class="info" style="margin-left: 15px; padding: 4px 12px; font-size: 0.8rem;">🔄 Przelicz wszystkie czasy</button>
+            <button id="loadResultsBtn" class="success" style="margin-left: 15px; padding: 4px 12px; font-size: 0.8rem;">📥 Załaduj wyniki z Firebase</button>
+        </div>
+    `;
+    
+    // Przygotuj tory z danymi z protokołu
+    const tory = protocol.tory || [];
+    const wyniki = protocol.wyniki || [];
+    
+    let html = `
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Tor</th>
+                    <th>Nr</th>
+                    <th>Zawodnik</th>
+                    <th>Rocznik</th>
+                    <th>Kategoria</th>
+                    <th>Status</th>
+                    <th>Czas na mecie</th>
+                    <th>Czas biegu</th>
+                    <th>Miejsce</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    for (let i = 0; i < tory.length; i++) {
+        const tor = tory[i];
+        const wynik = wyniki[i] || {};
+        const nrStartowy = tor.nr_startowy || '';
+        const zawodnik = tor.zawodnik || {};
+        
+        // ============================================================
+        // SPRAWDZAMY CZY MAMY WYNIK Z Firebase DLA TEGO ZAWODNIKA
+        // ============================================================
+        let wynikZFirebase = null;
+        if (nrStartowy && wynikiMap[nrStartowy]) {
+            wynikZFirebase = wynikiMap[nrStartowy];
+        }
+        
+        // Sprawdź zgodność z kategorią/konkurencją
+        const zgodnosc = sprawdzZgodnoscZawodnika(zawodnik, protocol.kategoria, protocol.konkurencja);
+        const kolorTla = zgodnosc.zgodny ? '' : 'background: #fff3cd;';
+        
+        // ============================================================
+        // WCZYTANIE WYNIKÓW - PRIORYTET: Firebase > protokół
+        // ============================================================
+        let czasNaMecie = '';
+        let recznyCzasBiegu = '';
+        let status = '';
+        let miejsce = '';
+        
+        if (wynikZFirebase) {
+            czasNaMecie = wynikZFirebase.czas || '';
+            if (czasNaMecie && !wynik.czas_na_mecie) {
+                recznyCzasBiegu = czasNaMecie;
+            }
+        }
+        
+        if (!czasNaMecie && wynik.czas_na_mecie) {
+            czasNaMecie = wynik.czas_na_mecie;
+        }
+        if (!recznyCzasBiegu && wynik.reczny_czas_biegu) {
+            recznyCzasBiegu = wynik.reczny_czas_biegu;
+        }
+        if (!status && wynik.status) {
+            status = wynik.status;
+        }
+        if (!miejsce && wynik.miejsce) {
+            miejsce = wynik.miejsce;
+        }
+        
+        let czasBieguDoWyswietlenia = recznyCzasBiegu;
+        if (!czasBieguDoWyswietlenia && czasNaMecie && protocol.czas_startu) {
+            const obliczony = obliczCzasBiegu(protocol.czas_startu, czasNaMecie);
+            czasBieguDoWyswietlenia = obliczony.formatted;
+        }
+        
+        const czyZFirebase = wynikZFirebase ? '🔥' : '';
+        
+        html += `
+            <tr style="${kolorTla}" data-tor="${tor.numer}">
+                <td style="text-align: center; font-weight: bold;">${tor.numer} ${czyZFirebase}</td>
+                <td><input type="text" class="nr-startowy-input" data-tor="${tor.numer}" value="${nrStartowy}" style="width:70px; padding:4px; border-radius:4px; border:1px solid #ddd;"></td>
+                <td class="zawodnik-info" data-tor="${tor.numer}">
+                    ${zawodnik.imie || ''} ${zawodnik.nazwisko || ''}
+                    ${!zgodnosc.zgodny ? `<span style="color:#dc3545; font-size:0.7rem;"> ${zgodnosc.szczegoly}</span>` : ''}
+                    ${wynikZFirebase ? '<span style="color:#28a745; font-size:0.7rem;"> ✅ wynik zapisany</span>' : ''}
+                </td>
+                <td class="rocznik-cell" data-tor="${tor.numer}">${zawodnik.rocznik || '-'}</td>
+                <td class="kategoria-cell" data-tor="${tor.numer}">${zawodnik.kategoria || '-'}</td>
+                <td>
+                    <select class="status-select" data-tor="${tor.numer}" style="padding:4px; border-radius:4px; border:1px solid #ddd;">
+                        <option value="" ${status === '' ? 'selected' : ''}>--</option>
+                        <option value="PK" ${status === 'PK' ? 'selected' : ''}>PK</option>
+                        <option value="DNF" ${status === 'DNF' ? 'selected' : ''}>DNF</option>
+                        <option value="DNS" ${status === 'DNS' ? 'selected' : ''}>DNS</option>
+                        <option value="DQ" ${status === 'DQ' ? 'selected' : ''}>DQ</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="text" class="czas-meta-input" data-tor="${tor.numer}" 
+                           value="${czasNaMecie}" 
+                           placeholder="HH:MM:SS.mmm" 
+                           style="width:130px; padding:4px; border-radius:4px; border:1px solid #ddd; font-family:monospace;
+                                  ${wynikZFirebase ? 'background: #d4edda;' : ''}">
+                </td>
+                <td>
+                    <input type="text" class="reczny-czas-input" data-tor="${tor.numer}" 
+                           value="${czasBieguDoWyswietlenia}" 
+                           placeholder="MM:SS.mmm" 
+                           style="width:100px; padding:4px; border-radius:4px; border:1px solid #ddd; font-family:monospace;
+                                  ${wynikZFirebase ? 'background: #d4edda;' : ''}">
+                </td>
+                <td>
+                    <input type="text" class="miejsce-input" data-tor="${tor.numer}" 
+                           value="${miejsce}" 
+                           placeholder="#" 
+                           style="width:50px; padding:4px; border-radius:4px; border:1px solid #ddd; text-align:center;">
+                </td>
+            </tr>
+        `;
+    }
+    
+    html += `
+            </tbody>
+        </table>
+        <div style="margin-top: 15px; font-size: 0.85rem; color: #666;">
+            <span style="background: #d4edda; padding: 4px 12px; border-radius: 12px;">✅ Zgodny z kategorią/konkurencją</span>
+            <span style="background: #fff3cd; padding: 4px 12px; border-radius: 12px; margin-left: 10px;">⚠️ Ostrzeżenie - sprawdź dane</span>
+            <span style="background: #d4edda; padding: 4px 12px; border-radius: 12px; margin-left: 10px;">🔥 Wynik z Firebase</span>
+        </div>
+    `;
+    
+    document.getElementById('resultsEditor').innerHTML = html;
+    document.getElementById('editPanel').style.display = 'block';
+    
+    // ============================================================
+    // PRZYCISK - ZAŁADUJ WYNIKI Z FIREBASE
+    // ============================================================
+    const loadBtn = document.getElementById('loadResultsBtn');
+    if (loadBtn) {
+        loadBtn.addEventListener('click', () => {
+            loadProtocolForEdit(protocolId);
+            addLog('🔄 Przeładowano wyniki z Firebase', 'success');
+        });
+    }
+    
+    // ============================================================
+    // AUTOMATYCZNE PRZELICZANIE CZASU PRZY ZMIANIE CZASU NA MECIE
+    // ============================================================
+    document.querySelectorAll('.czas-meta-input').forEach(input => {
+        input.addEventListener('change', function() {
+            const tor = this.getAttribute('data-tor');
+            const recznyInput = document.querySelector(`.reczny-czas-input[data-tor="${tor}"]`);
+            if (recznyInput && currentProtocol.czas_startu) {
+                const czasBiegu = obliczCzasBiegu(currentProtocol.czas_startu, this.value);
+                if (czasBiegu.formatted) {
+                    recznyInput.value = czasBiegu.formatted;
+                    addLog(`🔄 Przeliczono czas dla toru ${tor}: ${czasBiegu.formatted}`, 'success');
+                }
+            }
+        });
+    });
+    
+    // ============================================================
+    // EVENT LISTENER DLA NUMERÓW STARTOWYCH
+    // ============================================================
+    document.querySelectorAll('.nr-startowy-input').forEach(input => {
+        input.addEventListener('change', async (e) => {
+            const tor = e.target.getAttribute('data-tor');
+            const nrStartowy = e.target.value.trim();
+            const row = e.target.closest('tr');
+            const zawodnikInfo = row.querySelector('.zawodnik-info');
+            const rocznikCell = row.querySelector('.rocznik-cell');
+            const kategoriaCell = row.querySelector('.kategoria-cell');
+            
+            if (!nrStartowy) {
+                zawodnikInfo.innerText = '';
+                rocznikCell.innerText = '-';
+                kategoriaCell.innerText = '-';
+                return;
+            }
+            
+            let znaleziony = null;
+            for (const [id, z] of Object.entries(zawodnicyData)) {
+                if (z.nr_startowy == nrStartowy || z.id === nrStartowy) {
+                    znaleziony = z;
+                    break;
+                }
+            }
+            
+            if (znaleziony) {
+                const zgodnosc = sprawdzZgodnoscZawodnika(znaleziony, protocol.kategoria, protocol.konkurencja);
+                const statusText = zgodnosc.zgodny ? '✅' : '⚠️ ' + zgodnosc.szczegoly;
+                zawodnikInfo.innerHTML = `${znaleziony.imie || ''} ${znaleziony.nazwisko || ''} <span style="font-size:0.7rem; color:${zgodnosc.zgodny ? '#28a745' : '#dc3545'};">${statusText}</span>`;
+                rocznikCell.innerText = znaleziony.rocznik || '-';
+                kategoriaCell.innerText = znaleziony.pelna_kategoria || znaleziony.kategoria_wiekowa || '-';
+                
+                if (!currentProtocol.tory[tor-1].zawodnik) currentProtocol.tory[tor-1].zawodnik = {};
+                currentProtocol.tory[tor-1].zawodnik.id = znaleziony.id;
+                currentProtocol.tory[tor-1].zawodnik.imie = znaleziony.imie;
+                currentProtocol.tory[tor-1].zawodnik.nazwisko = znaleziony.nazwisko;
+                currentProtocol.tory[tor-1].zawodnik.rocznik = znaleziony.rocznik;
+                currentProtocol.tory[tor-1].zawodnik.kategoria = znaleziony.pelna_kategoria || znaleziony.kategoria_wiekowa;
+                currentProtocol.tory[tor-1].nr_startowy = nrStartowy;
+                
+                addLog(`✅ Wczytano: ${znaleziony.imie} ${znaleziony.nazwisko}`, 'success');
+            } else {
+                zawodnikInfo.innerText = '❌ Nie znaleziono';
+                rocznikCell.innerText = '-';
+                kategoriaCell.innerText = '-';
+                addLog(`⚠️ Nie znaleziono zawodnika z numerem ${nrStartowy}`, 'warning');
+            }
+        });
+    });
+    
+        // ============================================================
+    // GLOBALNE PRZELICZANIE CZASÓW + MIEJSC
+    // ============================================================
+    const globalBtn = document.getElementById('globalRecalcBtn');
+    if (globalBtn) {
+        const newBtn = globalBtn.cloneNode(true);
+        globalBtn.parentNode.replaceChild(newBtn, globalBtn);
+        newBtn.addEventListener('click', () => {
+            const czasMetaInputs = document.querySelectorAll('.czas-meta-input');
+            let count = 0;
+            
+            // ============================================================
+            // KROK 1: Przelicz wszystkie czasy
+            // ============================================================
+            czasMetaInputs.forEach(input => {
+                const tor = input.getAttribute('data-tor');
+                const recznyInput = document.querySelector(`.reczny-czas-input[data-tor="${tor}"]`);
+                if (recznyInput && currentProtocol.czas_startu) {
+                    const czasBiegu = obliczCzasBiegu(currentProtocol.czas_startu, input.value);
+                    if (czasBiegu.formatted) {
+                        recznyInput.value = czasBiegu.formatted;
+                        count++;
+                    }
+                }
+            });
+            
+            // ============================================================
+            // KROK 2: Pobierz wszystkie czasy i posortuj
+            // ============================================================
+            const results = [];
+            document.querySelectorAll('.reczny-czas-input').forEach(input => {
+                const tor = parseInt(input.getAttribute('data-tor'));
+                const czas = input.value.trim();
+                const statusSelect = document.querySelector(`.status-select[data-tor="${tor}"]`);
+                const status = statusSelect ? statusSelect.value : '';
+                
+                // Pomijamy zawodników ze statusem (PK, DNF, DNS, DQ)
+                if (status && status !== '') {
+                    results.push({
+                        tor: tor,
+                        czas: czas,
+                        status: status,
+                        czasSekundy: null,
+                        miejsce: null
+                    });
+                    return;
+                }
+                
+                // Parsuj czas MM:SS.mmm na sekundy
+                let czasSekundy = null;
+                if (czas) {
+                    const parts = czas.split(':');
+                    if (parts.length === 2) {
+                        const mins = parseInt(parts[0]);
+                        const secs = parseFloat(parts[1]);
+                        if (!isNaN(mins) && !isNaN(secs)) {
+                            czasSekundy = mins * 60 + secs;
+                        }
+                    }
+                }
+                
+                results.push({
+                    tor: tor,
+                    czas: czas,
+                    status: status,
+                    czasSekundy: czasSekundy,
+                    miejsce: null
+                });
+            });
+            
+            // ============================================================
+            // KROK 3: Posortuj tylko zawodników bez statusu
+            // ============================================================
+            const normalni = results.filter(r => !r.status || r.status === '');
+            
+            // Sortuj od najlepszego czasu (najmniejsza wartość)
+            normalni.sort((a, b) => {
+                // Jeśli obaj mają NULL, są równe
+                if (a.czasSekundy === null && b.czasSekundy === null) return 0;
+                if (a.czasSekundy === null) return 1;  // NULL na koniec
+                if (b.czasSekundy === null) return -1; // NULL na koniec
+                return a.czasSekundy - b.czasSekundy;
+            });
+            
+            // ============================================================
+            // KROK 4: Przypisz miejsca (z uwzględnieniem ex aequo)
+            // ============================================================
+            let position = 1;
+            let i = 0;
+            
+            while (i < normalni.length) {
+                let j = i;
+                // Znajdź grupę z identycznymi czasami
+                while (j < normalni.length - 1 && 
+                       normalni[j].czasSekundy === normalni[j+1].czasSekundy &&
+                       normalni[j].czasSekundy !== null) {
+                    j++;
+                }
+                
+                const countInGroup = j - i + 1;
+                const isExAequo = countInGroup > 1;
+                
+                // Przypisz tę samą pozycję dla całej grupy
+                for (let k = i; k <= j; k++) {
+                    normalni[k].miejsce = position;
+                    normalni[k].ex_aequo = isExAequo;
+                }
+                
+                position += countInGroup;
+                i = j + 1;
+            }
+            
+            // ============================================================
+            // KROK 5: Zaktualizuj pola miejsc w tabeli
+            // ============================================================
+            const miejsceMap = {};
+            results.forEach(r => {
+                if (r.miejsce !== null) {
+                    const exAequoSuffix = r.ex_aequo ? '=' : '';
+                    miejsceMap[r.tor] = r.miejsce + exAequoSuffix;
+                } else if (r.status) {
+                    // Dla zawodników ze statusem - zostaw puste
+                    miejsceMap[r.tor] = '';
+                }
+            });
+            
+            // Wstaw miejsca do pól
+            document.querySelectorAll('.miejsce-input').forEach(input => {
+                const tor = parseInt(input.getAttribute('data-tor'));
+                if (miejsceMap[tor] !== undefined) {
+                    input.value = miejsceMap[tor];
+                }
+            });
+            
+            // ============================================================
+            // KROK 6: Log i informacja zwrotna
+            // ============================================================
+            const zMiejscem = Object.values(miejsceMap).filter(v => v !== '').length;
+            const zeStatusem = results.filter(r => r.status && r.status !== '').length;
+            const bezCzasu = results.filter(r => !r.status && !r.czas).length;
+            
+            let infoMsg = `✅ Przeliczono ${count} czasów`;
+            if (zMiejscem > 0) infoMsg += `, przypisano ${zMiejscem} miejsc`;
+            if (zeStatusem > 0) infoMsg += `, ${zeStatusem} ze statusem (pominiętych)`;
+            if (bezCzasu > 0) infoMsg += `, ${bezCzasu} bez czasu`;
+            
+            addLog(infoMsg, 'success');
+            showMessage(infoMsg, 'success');
+        });
+    }
+    
+    // Event listeners dla przycisków
+    document.getElementById('saveResultsBtn').onclick = () => saveResults(protocolId);
+    document.getElementById('deleteProtocolBtn').onclick = () => deleteProtocol(protocolId);
+}
+
+// Funkcja sprawdzania zgodności zawodnika
+function sprawdzZgodnoscZawodnika(zawodnik, wymaganaKategoria, wymaganaKonkurencja) {
+    if (!zawodnik || !zawodnik.imie) {
+        return { zgodny: false, szczegoly: 'Brak danych zawodnika' };
+    }
+    
+    const problemy = [];
+    
+    // Sprawdzenie kategorii
+    const pelnaKategoria = zawodnik.kategoria || zawodnik.pelna_kategoria || zawodnik.kategoria_wiekowa;
+    if (pelnaKategoria && wymaganaKategoria && pelnaKategoria !== wymaganaKategoria) {
+        problemy.push(`Kategoria: ${pelnaKategoria} (oczekiwano: ${wymaganaKategoria})`);
+    }
+    
+    // Sprawdzenie konkurencji
+    const konkurencjeZawodnika = [];
+    if (zawodnik.konkurencja1) konkurencjeZawodnika.push(zawodnik.konkurencja1);
+    if (zawodnik.konkurencja2) konkurencjeZawodnika.push(zawodnik.konkurencja2);
+    
+    if (!konkurencjeZawodnika.includes(wymaganaKonkurencja)) {
+        problemy.push(`Nie startuje w ${wymaganaKonkurencja} (ma: ${konkurencjeZawodnika.join(', ') || 'brak'})`);
+    }
+    
+    // Sprawdzenie rezygnacji
+    if (zawodnik.rezygnacja === 'TRUE' || zawodnik.rezygnacja === true) {
+        problemy.push('⚠️ Zawodnik zrezygnował');
+    }
+    
+    return {
+        zgodny: problemy.length === 0,
+        szczegoly: problemy.join(' | ')
+    };
+}
 
 		// ==================== 9. WYNIKI KOŃCOWE (biegi) ====================
 		async function setZakonczoneBiegi(konkurencja, kategoria) {
@@ -1265,6 +1842,8 @@ function renderZawodnicyTable(container) {
 		addLog(`🔒 Zakończono konkurencję ${konkurencja} - ${kategoria} (${count} protokołów)`, 'success');
 		await loadRanking(); // odśwież widok
 	}
+	
+	// =================================== 10.Wyniki ===========================
 		function showRankingView(panel) {
 			panel.innerHTML = `<div class="card"><h3>📊 Wyniki końcowe (biegi)</h3><button id="loadRankingBtn" class="info">🔄 Załaduj wszystkie protokoły</button><button id="printRankingBtn" class="success" style="margin-left:10px;">🖨️ Drukuj</button><div id="rankingContainer" style="margin-top:20px;"></div></div>`;
 			document.getElementById('loadRankingBtn').addEventListener('click', loadRanking);
@@ -1272,179 +1851,246 @@ function renderZawodnicyTable(container) {
 		}
 		
 	   async function loadRanking() {
-		const container = document.getElementById('rankingContainer');
-		if (!container) return;
-		container.innerHTML = '<div class="loading">⏳ Ładowanie wyników...</div>';
-		
-		const snapshot = await database.ref('protokoly').once('value');
-		const data = snapshot.val();
-		if (!data || Object.keys(data).length === 0) { 
-			container.innerHTML = '<div class="card">📭 Brak protokołów z wynikami.</div>'; 
-			return; 
-		}
-		
-		const allResults = [];
-		for (const [protocolId, protocol] of Object.entries(data)) {
-			if (!protocol.wyniki || !protocol.tory) continue;
-			const tory = protocol.tory, wyniki = protocol.wyniki;
-			for (let i = 0; i < tory.length && i < wyniki.length; i++) {
-				const tor = tory[i], wynik = wyniki[i], zawodnik = tor.zawodnik || {};
-				allResults.push({
-					id: zawodnik.id,
-					nr_startowy: tor.nr_startowy || '',
-					imie: zawodnik.imie || '',
-					nazwisko: zawodnik.nazwisko || '',
-					rocznik: zawodnik.rocznik || '',
-					kategoria: protocol.kategoria || '',
-					konkurencja: protocol.konkurencja || '',
-					numer_biegu: protocol.numer_biegu || '',
-					tor: tor.numer,
-					status: wynik.status || null,
-					miejsce_w_biegu: wynik.miejsce || null,
-					czas_biegu_format: wynik.czas_biegu_format || '',
-					czas_biegu_sekundy: wynik.czas_biegu_sekundy || null,
-					zakonczone: protocol.zakonczone === true   // <- DODANE
-				});
-			}
-		}
-		
-		if (allResults.length === 0) { 
-			container.innerHTML = '<div class="card">📭 Brak wyników.</div>'; 
-			return; 
-		}
-		
-		// Zlicz duplikaty numerów startowych TYLKO dla normalnych (bez statusu)
-		const nrStartowyCount = {};
-		for (const r of allResults) {
-			if (!r.status || r.status === '') {
-				if (r.nr_startowy) {
-					nrStartowyCount[r.nr_startowy] = (nrStartowyCount[r.nr_startowy] || 0) + 1;
-				}
-			}
-		}
-		
-		// Grupowanie po konkurencji i kategorii
-		const groups = {};
-		for (const r of allResults) { 
-			const key = `${r.konkurencja}_${r.kategoria}`; 
-			if (!groups[key]) groups[key] = []; 
-			groups[key].push(r); 
-		}
-		
-		let html = '';
-		
-		for (const [key, results] of Object.entries(groups)) {
-			const [konkurencja, kategoria] = key.split('_');
-			
-			// Sprawdź, czy którykolwiek protokół w grupie jest zakończony
-			const isZakonczone = results.some(r => r.zakonczone === true);
-			
-			// Podział na grupy: normalni, PK, inni
-			const normalni = results.filter(r => !r.status || r.status === '');
-			const pk = results.filter(r => r.status === 'PK');
-			const inni = results.filter(r => r.status && r.status !== 'PK');
-			
-			// Sortowanie
-			normalni.sort((a, b) => (a.czas_biegu_sekundy || 999999) - (b.czas_biegu_sekundy || 999999));
-			pk.sort((a, b) => (a.czas_biegu_sekundy || 999999) - (b.czas_biegu_sekundy || 999999));
-			const statusOrder = { 'DNF': 0, 'DQ': 1, 'DNS': 2 };
-			inni.sort((a, b) => {
-				const orderA = statusOrder[a.status] || 3;
-				const orderB = statusOrder[b.status] || 3;
-				if (orderA !== orderB) return orderA - orderB;
-				return (a.czas_biegu_sekundy || 999999) - (b.czas_biegu_sekundy || 999999);
-			});
-			
-			// Nadanie pozycji tylko dla normalnych
-			let position = 1;
-			for (const r of normalni) r.pozycja = position++;
-			
-			// Generuj kartę z przyciskiem zamykania
-			html += `<div class="card" style="margin-top: 20px;">
-				<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-					<h3>${konkurencja || '?'} - ${kategoria || '?'} ${isZakonczone ? '🔒' : ''}</h3>`;
-			if (!isZakonczone) {
-				html += `<button class="close-competition-btn" data-konkurencja="${konkurencja}" data-kategoria="${kategoria}" style="background:#dc3545; margin-left:15px; margin-top:0;">🔒 Zakończ konkurencję</button>`;
-			} else {
-				html += `<button class="close-competition-btn" disabled style="background:#6c757d; margin-left:15px; margin-top:0;">✅ Zamknięta</button>`;
-			}
-			html += `</div>`;
-			
-			if (isZakonczone) {
-				html += `<div class="info-note" style="background:#d4edda;">🔒 Konkurencja została zakończona. Wyniki są ostateczne.</div>`;
-			}
-			
-			html += `<table class="ranking-table"><thead>
-				<th>Poz.</th><th>Nr</th><th>Zawodnik</th><th>Rocznik</th><th>Czas</th><th>Bieg</th><th>Miejsce w biegu</th><th>Status</th>
-			</thead><tbody>`;
-			
-			// Normalni
-			for (const r of normalni) {
-				const isDuplicate = nrStartowyCount[r.nr_startowy] > 2;
-				const nrStyle = isDuplicate ? 'style="background:#fff3cd; font-weight:bold;"' : '';
-				let rowClass = '';
-				if (r.pozycja === 1) rowClass = 'position-1';
-				else if (r.pozycja === 2) rowClass = 'position-2';
-				else if (r.pozycja === 3) rowClass = 'position-3';
-				html += `<tr class="${rowClass}">
-					<td class="position-cell"><strong>${r.pozycja}</strong></td>
-					<td ${nrStyle}>${r.nr_startowy || '-'}${isDuplicate ? ' ⚠️' : ''}</td>
-					<td><strong>${r.imie} ${r.nazwisko}</strong></td>
-					<td>${r.rocznik || '-'}</td>
-					<td><strong>${r.czas_biegu_format || '-'}</strong></td>
-					<td>${r.numer_biegu || '-'}</td>
-					<td>${r.miejsce_w_biegu || '-'}</td>
-					<td><span class="status-badge">-</span></td>
-				</tr>`;
-			}
-			// PK
-			for (const r of pk) {
-				html += `<tr>
-					<td class="position-cell">PK</td>
-					<td>${r.nr_startowy || '-'}</td>
-					<td>${r.imie} ${r.nazwisko}</td>
-					<td>${r.rocznik || '-'}</td>
-					<td>${r.czas_biegu_format || '-'}</td>
-					<td>${r.numer_biegu || '-'}</td>
-					<td>${r.miejsce_w_biegu || '-'}</td>
-					<td><span class="status-badge status-pk">PK</span></td>
-				</tr>`;
-			}
-			// DNF, DQ, DNS
-			for (const r of inni) {
-				let statusClass = '';
-				if (r.status === 'DNF') statusClass = 'status-dnf';
-				else if (r.status === 'DQ') statusClass = 'status-dq';
-				else if (r.status === 'DNS') statusClass = 'status-dns';
-				html += `<tr>
-					<td class="position-cell">${r.status}</td>
-					<td>${r.nr_startowy || '-'}</td>
-					<td>${r.imie} ${r.nazwisko}</td>
-					<td>${r.rocznik || '-'}</td>
-					<td>${r.czas_biegu_format || '-'}</td>
-					<td>${r.numer_biegu || '-'}</td>
-					<td>${r.miejsce_w_biegu || '-'}</td>
-					<td><span class="status-badge ${statusClass}">${r.status}</span></td>
-				</tr>`;
-			}
-			html += `</tbody></table></div>`;
-		}
-		container.innerHTML = html;
-		addLog(`✅ Załadowano ${allResults.length} wyników biegowych`, 'success');
-		
-		// Obsługa przycisków zamykania konkurencji
-		document.querySelectorAll('#rankingContainer .close-competition-btn:not([disabled])').forEach(btn => {
-			btn.addEventListener('click', async (e) => {
-				const konkurencja = btn.getAttribute('data-konkurencja');
-				const kategoria = btn.getAttribute('data-kategoria');
-				if (confirm(`Czy na pewno chcesz zakończyć konkurencję: ${konkurencja} - ${kategoria}? Wszystkie protokoły dla tej konkurencji zostaną zamknięte.`)) {
-					await setZakonczoneBiegi(konkurencja, kategoria);
-				}
-			});
-		});
-	}
+    const container = document.getElementById('rankingContainer');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">⏳ Ładowanie wyników...</div>';
+    
+    const snapshot = await database.ref('protokoly').once('value');
+    const data = snapshot.val();
+    if (!data || Object.keys(data).length === 0) { 
+        container.innerHTML = '<div class="card">📭 Brak protokołów z wynikami.</div>'; 
+        return; 
+    }
+    
+    const allResults = [];
+    for (const [protocolId, protocol] of Object.entries(data)) {
+        if (!protocol.wyniki || !protocol.tory) continue;
+        const tory = protocol.tory, wyniki = protocol.wyniki;
+        for (let i = 0; i < tory.length && i < wyniki.length; i++) {
+            const tor = tory[i], wynik = wyniki[i], zawodnik = tor.zawodnik || {};
+            allResults.push({
+                id: zawodnik.id,
+                nr_startowy: tor.nr_startowy || '',
+                imie: zawodnik.imie || '',
+                nazwisko: zawodnik.nazwisko || '',
+                rocznik: zawodnik.rocznik || '',
+                kategoria: protocol.kategoria || '',
+                konkurencja: protocol.konkurencja || '',
+                numer_biegu: protocol.numer_biegu || '',
+                tor: tor.numer,
+                status: wynik.status || null,
+                miejsce_w_biegu: wynik.miejsce || null,
+                czas_biegu_format: wynik.czas_biegu_format || '',
+                czas_biegu_sekundy: wynik.czas_biegu_sekundy || null,
+                zakonczone: protocol.zakonczone === true
+            });
+        }
+    }
+    
+    if (allResults.length === 0) { 
+        container.innerHTML = '<div class="card">📭 Brak wyników.</div>'; 
+        return; 
+    }
+    
+    // Zlicz duplikaty numerów startowych TYLKO dla normalnych (bez statusu)
+    const nrStartowyCount = {};
+    for (const r of allResults) {
+        if (!r.status || r.status === '') {
+            if (r.nr_startowy) {
+                nrStartowyCount[r.nr_startowy] = (nrStartowyCount[r.nr_startowy] || 0) + 1;
+            }
+        }
+    }
+    
+    // Grupowanie po konkurencji i kategorii
+    const groups = {};
+    for (const r of allResults) { 
+        const key = `${r.konkurencja}_${r.kategoria}`; 
+        if (!groups[key]) groups[key] = []; 
+        groups[key].push(r); 
+    }
+    
+    let html = '';
+    
+    for (const [key, results] of Object.entries(groups)) {
+        const [konkurencja, kategoria] = key.split('_');
+        
+        // Sprawdź, czy którykolwiek protokół w grupie jest zakończony
+        const isZakonczone = results.some(r => r.zakonczone === true);
+        
+        // Podział na grupy: normalni, PK, inni
+        const normalni = results.filter(r => !r.status || r.status === '');
+        const pk = results.filter(r => r.status === 'PK');
+        const inni = results.filter(r => r.status && r.status !== 'PK');
+        
+        // ============================================================
+        // SORTOWANIE Z UWZGLĘDNIENIEM EX AEQUO
+        // ============================================================
+        
+        // Sortowanie normalnych (od najlepszego czasu)
+        normalni.sort((a, b) => {
+            const czasA = a.czas_biegu_sekundy !== null ? a.czas_biegu_sekundy : Infinity;
+            const czasB = b.czas_biegu_sekundy !== null ? b.czas_biegu_sekundy : Infinity;
+            return czasA - czasB;
+        });
+        
+        // ============================================================
+        // PRZYZNAWANIE MIEJSC Z EX AEQUO DLA NORMALNYCH
+        // ============================================================
+        let position = 1;
+        let i = 0;
+        
+        while (i < normalni.length) {
+            let j = i;
+            // Znajdź grupę zawodników z identycznymi czasami (ex aequo)
+            while (j < normalni.length - 1 && 
+                   normalni[j].czas_biegu_sekundy === normalni[j+1].czas_biegu_sekundy &&
+                   normalni[j].czas_biegu_sekundy !== null) {
+                j++;
+            }
+            
+            const countInGroup = j - i + 1;
+            const isExAequo = countInGroup > 1;
+            
+            // Przypisz tę samą pozycję dla całej grupy
+            for (let k = i; k <= j; k++) {
+                normalni[k].pozycja = position;
+                normalni[k].ex_aequo = isExAequo;
+            }
+            
+            position += countInGroup;
+            i = j + 1;
+        }
+        
+        // PK sortowane osobno (bez ex aequo)
+        pk.sort((a, b) => {
+            const czasA = a.czas_biegu_sekundy !== null ? a.czas_biegu_sekundy : Infinity;
+            const czasB = b.czas_biegu_sekundy !== null ? b.czas_biegu_sekundy : Infinity;
+            return czasA - czasB;
+        });
+        for (let idx = 0; idx < pk.length; idx++) {
+            pk[idx].pozycja = null; // PK nie mają pozycji
+        }
+        
+        // Inni (DNF, DQ, DNS) - sortowanie po statusie
+        const statusOrder = { 'DNF': 0, 'DQ': 1, 'DNS': 2 };
+        inni.sort((a, b) => {
+            const orderA = statusOrder[a.status] || 3;
+            const orderB = statusOrder[b.status] || 3;
+            if (orderA !== orderB) return orderA - orderB;
+            const czasA = a.czas_biegu_sekundy !== null ? a.czas_biegu_sekundy : Infinity;
+            const czasB = b.czas_biegu_sekundy !== null ? b.czas_biegu_sekundy : Infinity;
+            return czasA - czasB;
+        });
+        for (const r of inni) {
+            r.pozycja = null; // Inni nie mają pozycji
+        }
+        
+        // ============================================================
+        // GENEROWANIE KARTY Z WYNIKAMI
+        // ============================================================
+        
+        html += `<div class="card" style="margin-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <h3>${konkurencja || '?'} - ${kategoria || '?'} ${isZakonczone ? '🔒' : ''}</h3>`;
+        if (!isZakonczone) {
+            html += `<button class="close-competition-btn" data-konkurencja="${konkurencja}" data-kategoria="${kategoria}" style="background:#dc3545; margin-left:15px; margin-top:0;">🔒 Zakończ konkurencję</button>`;
+        } else {
+            html += `<button class="close-competition-btn" disabled style="background:#6c757d; margin-left:15px; margin-top:0;">✅ Zamknięta</button>`;
+        }
+        html += `</div>`;
+        
+        if (isZakonczone) {
+            html += `<div class="info-note" style="background:#d4edda;">🔒 Konkurencja została zakończona. Wyniki są ostateczne.</div>`;
+        }
+        
+        html += `<table class="ranking-table"><thead>
+            <th>Poz.</th><th>Nr</th><th>Zawodnik</th><th>Rocznik</th><th>Czas</th><th>Bieg</th><th>Miejsce w biegu</th><th>Status</th>
+        </thead><tbody>`;
+        
+        // ============================================================
+        // NORMALNI (z pozycjami)
+        // ============================================================
+        for (const r of normalni) {
+            const isDuplicate = nrStartowyCount[r.nr_startowy] > 2;
+            const nrStyle = isDuplicate ? 'style="background:#fff3cd; font-weight:bold;"' : '';
+            let rowClass = '';
+            if (r.pozycja === 1) rowClass = 'position-1';
+            else if (r.pozycja === 2) rowClass = 'position-2';
+            else if (r.pozycja === 3) rowClass = 'position-3';
+            
+            // Wyświetlanie pozycji z ex aequo
+            let pozycjaDisplay = r.pozycja;
+            if (r.ex_aequo) {
+                pozycjaDisplay = r.pozycja + '=';
+            }
+            
+            html += `<tr class="${rowClass}">
+                <td class="position-cell"><strong>${pozycjaDisplay}</strong></td>
+                <td ${nrStyle}>${r.nr_startowy || '-'}${isDuplicate ? ' ⚠️' : ''}</td>
+                <td><strong>${r.imie} ${r.nazwisko}</strong></td>
+                <td>${r.rocznik || '-'}</td>
+                <td><strong>${r.czas_biegu_format || '-'}</strong></td>
+                <td>${r.numer_biegu || '-'}</td>
+                <td>${r.miejsce_w_biegu || '-'}</td>
+                <td><span class="status-badge">-</span></td>
+            </tr>`;
+        }
+        
+        // ============================================================
+        // PK
+        // ============================================================
+        for (const r of pk) {
+            html += `<tr>
+                <td class="position-cell">PK</td>
+                <td>${r.nr_startowy || '-'}</td>
+                <td>${r.imie} ${r.nazwisko}</td>
+                <td>${r.rocznik || '-'}</td>
+                <td>${r.czas_biegu_format || '-'}</td>
+                <td>${r.numer_biegu || '-'}</td>
+                <td>${r.miejsce_w_biegu || '-'}</td>
+                <td><span class="status-badge status-pk">PK</span></td>
+            </tr>`;
+        }
+        
+        // ============================================================
+        // INNI (DNF, DQ, DNS)
+        // ============================================================
+        for (const r of inni) {
+            let statusClass = '';
+            if (r.status === 'DNF') statusClass = 'status-dnf';
+            else if (r.status === 'DQ') statusClass = 'status-dq';
+            else if (r.status === 'DNS') statusClass = 'status-dns';
+            html += `<tr>
+                <td class="position-cell">${r.status}</td>
+                <td>${r.nr_startowy || '-'}</td>
+                <td>${r.imie} ${r.nazwisko}</td>
+                <td>${r.rocznik || '-'}</td>
+                <td>${r.czas_biegu_format || '-'}</td>
+                <td>${r.numer_biegu || '-'}</td>
+                <td>${r.miejsce_w_biegu || '-'}</td>
+                <td><span class="status-badge ${statusClass}">${r.status}</span></td>
+            </tr>`;
+        }
+        
+        html += `</tbody></table></div>`;
+    }
+    container.innerHTML = html;
+    addLog(`✅ Załadowano ${allResults.length} wyników biegowych`, 'success');
+    
+    // Obsługa przycisków zamykania konkurencji
+    document.querySelectorAll('#rankingContainer .close-competition-btn:not([disabled])').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const konkurencja = btn.getAttribute('data-konkurencja');
+            const kategoria = btn.getAttribute('data-kategoria');
+            if (confirm(`Czy na pewno chcesz zakończyć konkurencję: ${konkurencja} - ${kategoria}? Wszystkie protokoły dla tej konkurencji zostaną zamknięte.`)) {
+                await setZakonczoneBiegi(konkurencja, kategoria);
+            }
+        });
+    });
+}
 	   
-	   // ==================== 10. KONKURENCJE TECHNICZNE ====================
+	   // ==================== 11. KONKURENCJE TECHNICZNE ====================
 function showTechnicalView(panel) {
     panel.innerHTML = `<div class="card"><h3>🏅 Konkurencje techniczne</h3><button id="refreshTechBtn" class="info">🔄 Odśwież</button><button id="printTechBtn" class="success" style="margin-left:10px;">🖨️ Drukuj wyniki</button><div id="techContainer" style="margin-top:20px;"></div></div>`;
     loadTechnicalResults();

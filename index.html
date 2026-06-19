@@ -647,6 +647,7 @@ function showPreviewView(panel) {
     document.getElementById('refreshPreviewBtn')?.addEventListener('click', refreshPreviewData);
 }
 
+
 // Przechowuj dane w pamięci, aby nie odświeżać przy zmianie limitu
 let cachedStatsData = null;
 let cachedLimityData = null;
@@ -750,18 +751,13 @@ function renderStatsTable(statsContainer, stats, limityData, zakazaneData) {
         return;
     }
     
-    // Funkcja do sprawdzania czy konkurencja jest zakazana dla danej kategorii
     function isZakazane(konkurencja, kategoria) {
         if (!zakazaneData || Object.keys(zakazaneData).length === 0) return false;
-        
-        // Szukamy dokładnego dopasowania kategorii
         for (const [kat, zakazaneList] of Object.entries(zakazaneData)) {
             if (kat === kategoria && Array.isArray(zakazaneList)) {
                 return zakazaneList.includes(konkurencja);
             }
         }
-        
-        // Szukamy częściowego dopasowania
         for (const [kat, zakazaneList] of Object.entries(zakazaneData)) {
             if (kategoria.includes(kat) || kat.includes(kategoria)) {
                 if (Array.isArray(zakazaneList) && zakazaneList.includes(konkurencja)) {
@@ -769,20 +765,19 @@ function renderStatsTable(statsContainer, stats, limityData, zakazaneData) {
                 }
             }
         }
-        
         return false;
     }
     
     let statsHtml = `
     <div style="overflow-x: auto; margin-bottom: 20px;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; border: 1px solid #ddd;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.6rem; border: 1px solid #ddd;">
             <thead>
                 <tr style="background: #0a0f2c; color: white;">
-                    <th style="padding: 6px 10px; border: 1px solid #ddd; min-width: 120px; font-size: 0.75rem;">🏃 Konkurencja</th>
-                    <th style="padding: 6px 10px; border: 1px solid #ddd; min-width: 100px; font-size: 0.75rem;">📋 Kategoria</th>
-                    <th style="padding: 6px 10px; border: 1px solid #ddd; text-align: center; width: 60px; font-size: 0.75rem;">👥 Liczba</th>
-                    <th style="padding: 6px 10px; border: 1px solid #ddd; text-align: center; min-width: 120px; font-size: 0.75rem;">🎯 Limit</th>
-                    <th style="padding: 6px 10px; border: 1px solid #ddd; text-align: center; min-width: 120px; font-size: 0.75rem;">📊 Status</th>
+                    <th style="padding: 2px 6px; border: 1px solid #ddd; min-width: 80px; font-size: 0.6rem;">🏃 Konkurencja</th>
+                    <th style="padding: 2px 6px; border: 1px solid #ddd; min-width: 70px; font-size: 0.6rem;">📋 Kategoria</th>
+                    <th style="padding: 2px 6px; border: 1px solid #ddd; text-align: center; width: 35px; font-size: 0.6rem;">👥 Liczba</th>
+                    <th style="padding: 2px 6px; border: 1px solid #ddd; text-align: center; min-width: 80px; font-size: 0.6rem;">🎯 Limit</th>
+                    <th style="padding: 2px 6px; border: 1px solid #ddd; text-align: center; min-width: 80px; font-size: 0.6rem;">📊 Status</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -790,14 +785,10 @@ function renderStatsTable(statsContainer, stats, limityData, zakazaneData) {
     for (const key of sortedKeys) {
         const [konkurencja, kategoria] = key.split('|');
         const liczba = stats[key];
-        
         const limitKey = `${konkurencja}|${kategoria}`;
         let limit = limityData[limitKey] || '';
-        
-        // Sprawdź czy konkurencja jest zakazana dla tej kategorii
         const czyZakazane = isZakazane(konkurencja, kategoria);
         
-        // Obliczenie statusu limitu
         let statusLimit = '';
         let statusColor = '';
         let statusEmoji = '';
@@ -805,7 +796,6 @@ function renderStatsTable(statsContainer, stats, limityData, zakazaneData) {
         let rowBorder = '';
         
         if (czyZakazane) {
-            // Jeśli zakazane - cały wiersz na czerwono
             rowBackground = 'background: #ffebee !important;';
             rowBorder = 'border-left: 4px solid #dc3545;';
             statusLimit = 'ZAKAZANE!';
@@ -834,30 +824,30 @@ function renderStatsTable(statsContainer, stats, limityData, zakazaneData) {
 
         statsHtml += `
             <tr style="border-bottom: 1px solid #eee; ${rowBackground} ${rowBorder}" data-key="${key}" data-zakazane="${czyZakazane}">
-                <td style="padding: 4px 8px; font-weight: bold; background: ${czyZakazane ? '#ffcdd2' : '#f8f9fa'}; font-size: 0.8rem;">
+                <td style="padding: 1px 4px; font-weight: bold; background: ${czyZakazane ? '#ffcdd2' : '#f8f9fa'}; font-size: 0.6rem;">
                     ${konkurencja} ${czyZakazane ? '🚫' : ''}
                 </td>
-                <td style="padding: 4px 8px; font-size: 0.8rem; background: ${czyZakazane ? '#ffcdd2' : 'transparent'};">
+                <td style="padding: 1px 4px; font-size: 0.6rem; background: ${czyZakazane ? '#ffcdd2' : 'transparent'};">
                     ${kategoria} ${czyZakazane ? '⚠️' : ''}
                 </td>
-                <td style="padding: 4px 8px; text-align: center; font-weight: bold; background: ${czyZakazane ? '#ffcdd2' : '#f5f5f5'}; font-size: 0.9rem;" class="liczba-cell">${liczba}</td>
-                <td style="padding: 4px 8px; text-align: center; background: ${czyZakazane ? '#ffcdd2' : 'transparent'};">
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                <td style="padding: 1px 4px; text-align: center; font-weight: bold; background: ${czyZakazane ? '#ffcdd2' : '#f5f5f5'}; font-size: 0.65rem;" class="liczba-cell">${liczba}</td>
+                <td style="padding: 1px 4px; text-align: center; background: ${czyZakazane ? '#ffcdd2' : 'transparent'};">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 3px;">
                         <input type="number" 
                                class="limit-input" 
                                data-konkurencja="${konkurencja}" 
                                data-kategoria="${kategoria}"
                                value="${limit}" 
                                placeholder="brak"
-                               style="width: 60px; padding: 2px 4px; font-size: 0.75rem; border: ${czyZakazane ? '2px solid #dc3545' : '1px solid #0f3460'}; border-radius: 4px; text-align: center; background: ${czyZakazane ? '#ffcdd2' : 'white'};"
+                               style="width: 45px; padding: 1px 2px; font-size: 0.55rem; border: ${czyZakazane ? '2px solid #dc3545' : '1px solid #0f3460'}; border-radius: 3px; text-align: center; background: ${czyZakazane ? '#ffcdd2' : 'white'}; height: 18px;"
                                ${czyZakazane ? 'disabled' : ''}>
-                        <span style="font-size: 0.6rem; color: #999;">⏎</span>
+                        <span style="font-size: 0.45rem; color: #999;">⏎</span>
                     </div>
-                    ${czyZakazane ? '<div style="font-size: 0.6rem; color: #dc3545; font-weight: bold; margin-top: 2px;">🚫 ZAKAZANE</div>' : ''}
+                    ${czyZakazane ? '<div style="font-size: 0.45rem; color: #dc3545; font-weight: bold; margin-top: 1px;">🚫 ZAKAZANE</div>' : ''}
                 </td>
-                <td style="padding: 4px 8px; text-align: center; ${statusColor} border-radius: 4px; font-size: 0.75rem;" class="status-cell">
+                <td style="padding: 1px 4px; text-align: center; ${statusColor} border-radius: 3px; font-size: 0.55rem;" class="status-cell">
                     ${statusEmoji} ${statusLimit}
-                    ${czyZakazane ? '<br><span style="font-size: 0.6rem; color: #dc3545;">KONKURENCJA ZAKAZANA!</span>' : ''}
+                    ${czyZakazane ? '<br><span style="font-size: 0.45rem; color: #dc3545;">KONKURENCJA ZAKAZANA!</span>' : ''}
                 </td>
             </tr>`;
     }
@@ -869,7 +859,6 @@ function renderStatsTable(statsContainer, stats, limityData, zakazaneData) {
     
     statsContainer.innerHTML = statsHtml;
     
-    // ==================== OBSŁUGA ZMIANY LIMITU ====================
     document.querySelectorAll('.limit-input:not([disabled])').forEach(input => {
         input.addEventListener('change', async function(e) {
             const konkurencja = this.getAttribute('data-konkurencja');
@@ -881,14 +870,11 @@ function renderStatsTable(statsContainer, stats, limityData, zakazaneData) {
             const liczbaCell = row.querySelector('.liczba-cell');
             const liczba = parseInt(liczbaCell.textContent) || 0;
             
-            // Sprawdź czy nie jest zakazane
             const czyZakazane = row.getAttribute('data-zakazane') === 'true';
             if (czyZakazane) {
                 addLog('⚠️ Nie można ustawić limitu dla zakazanej konkurencji!', 'warning');
                 return;
             }
-            
-            console.log(`✏️ Zmiana limitu dla: ${konkurencja} | ${kategoria} -> ${limitValue}`);
             
             if (limitValue === '') {
                 try {
@@ -921,8 +907,6 @@ function renderStatsTable(statsContainer, stats, limityData, zakazaneData) {
                 this.blur();
             }
         });
-        
-        input.title = 'Wpisz limit (np. 20) dla tej konkurencji i kategorii';
     });
 }
 

@@ -12,22 +12,109 @@
 			* { margin: 0; padding: 0; box-sizing: border-box; }
 			body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; height: 100vh; overflow: hidden; }
 			.dashboard { display: flex; height: 100vh; }
-			.left-panel { width: 280px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 20px 0; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.1); overflow-y: auto; }
-			.logo { padding: 0 20px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px; }
-			.logo h2 { font-size: 1.3rem; margin-bottom: 5px; }
-			.logo p { font-size: 0.8rem; color: #888; }
-			.nav-btn { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin: 2px 12px; background: transparent; border: none; color: #ccc; font-size: 0.9rem; cursor: pointer; border-radius: 10px; transition: all 0.3s ease; text-align: left; width: calc(100% - 24px); }
+			.left-panel { 
+						width: 200px;  /* było 280px */
+						background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); 
+						color: white; 
+						padding: 15px 0; 
+						display: flex; 
+						flex-direction: column; 
+						box-shadow: 2px 0 10px rgba(0,0,0,0.1); 
+						overflow-y: auto; 
+					}
+			.logo { 
+					padding: 0 15px 15px 15px; 
+					border-bottom: 1px solid rgba(255,255,255,0.1); 
+					margin-bottom: 15px; 
+				}
+			.logo h2 { 
+				font-size: 1rem;  /* było 1.3rem */
+				margin-bottom: 3px; 
+			}
+			.logo p { 
+				font-size: 0.65rem;  /* było 0.8rem */
+				color: #888; 
+			}
+			.nav-btn { 
+					display: flex; 
+					align-items: center; 
+					gap: 6px; 
+					padding: 5px 10px; 
+					margin: 1px 8px; 
+					background: transparent; 
+					border: none; 
+					color: #ccc; 
+					font-size: 0.75rem;  /* było 0.9rem */
+					cursor: pointer; 
+					border-radius: 8px; 
+					transition: all 0.3s ease; 
+					text-align: left; 
+					width: calc(100% - 16px); 
+				}
 			.nav-btn:hover { background: rgba(255,255,255,0.1); color: white; }
 			.nav-btn.active { background: #0f3460; color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-			.nav-btn .icon { font-size: 1.2rem; width: 28px; }
+			.nav-btn .icon { 
+				font-size: 0.9rem;  /* było 1.2rem */
+				width: 22px; 
+			}
 			.middle-panel { flex: 1; padding: 20px; overflow-y: auto; background: #f8f9fa; }
-			.right-panel { width: 160px; background: #fff; border-left: 1px solid #ddd; display: flex; flex-direction: column; box-shadow: -2px 0 10px rgba(0,0,0,0.05); }
-			.errors-header { padding: 7px 10px; background: #dc3545; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-			.clear-errors { background: rgba(255,255,255,0.2); border: none; color: white; padding: 4px 10px; border-radius: 5px; cursor: pointer; }
-			.errors-list { flex: 1; overflow-y: auto; padding: 10px; }
-			.error-item { background: #f8d7da; color: #721c24; padding: 10px; margin-bottom: 8px; border-radius: 6px; font-size: 0.6rem; border-left: 3px solid #dc3545; word-break: break-word; }
-			.success-item { background: #d4edda; color: #155724; border-left-color: #28a745; }
-			.warning-item { background: #fff3cd; color: #856404; border-left-color: #ffc107; }
+			.right-panel { 
+				width: 130px;  /* było 160px */
+				background: #fff; 
+				border-left: 1px solid #ddd; 
+				display: flex; 
+				flex-direction: column; 
+				box-shadow: -2px 0 10px rgba(0,0,0,0.05); 
+			}
+
+			.errors-header { 
+				padding: 4px 8px;  /* było 7px 10px */
+				background: #dc3545; 
+				color: white; 
+				font-weight: bold; 
+				font-size: 0.65rem;  /* dodane */
+				display: flex; 
+				justify-content: space-between; 
+				align-items: center; 
+			}
+
+			.errors-list { 
+				flex: 1; 
+				overflow-y: auto; 
+				padding: 5px;  /* było 10px */
+			}
+
+			.error-item { 
+				background: #f8d7da; 
+				color: #721c24; 
+				padding: 4px 6px;  /* było 10px */
+				margin-bottom: 4px;  /* było 8px */
+				border-radius: 4px;  /* było 6px */
+				font-size: 0.5rem;  /* było 0.6rem */
+				border-left: 2px solid #dc3545;  /* było 3px */
+				word-break: break-word; 
+			}
+
+			.success-item { 
+				background: #d4edda; 
+				color: #155724; 
+				border-left-color: #28a745; 
+			}
+			.warning-item { 
+				background: #fff3cd; 
+				color: #856404; 
+				border-left-color: #ffc107; 
+			}
+
+			.clear-errors { 
+				background: rgba(255,255,255,0.2); 
+				border: none; 
+				color: white; 
+				padding: 2px 8px;  /* było 4px 10px */
+				border-radius: 4px;  /* było 5px */
+				cursor: pointer; 
+				font-size: 0.6rem;  /* dodane */
+			}
 			.card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 			.card h3 { margin-bottom: 15px; color: #1a1a2e; border-left: 4px solid #0f3460; padding-left: 12px; }
 			.file-upload { border: 2px dashed #ccc; padding: 30px; text-align: center; border-radius: 10px; cursor: pointer; transition: all 0.3s; }
@@ -260,7 +347,14 @@
 				return true;
 			} catch (err) { addLog(`❌ Błąd zapisu CSV: ${err.message}`, 'error'); return false; }
 		}
-
+		function refreshPreviewData() {
+			cachedStatsData = null;
+			cachedLimityData = null;
+			cachedZawodnicy = null;
+			cachedZakazaneData = null;
+			loadPreviewData();
+			addLog('🔄 Odświeżono dane', 'success');
+		}
 		function generateCleanId(rowData, index) {
 			if (rowData['ID'] && rowData['ID'].toString().trim() !== '') return rowData['ID'].toString().trim();
 			return `${Date.now()}${index}`;
@@ -302,16 +396,20 @@
 		}
 
 		async function loadZawodnicy() {
-			const snapshot = await database.ref('zawodnicy').once('value');
-			const data = snapshot.val();
-			if (data) {
-				zawodnicyMap.clear();
-				for (const [id, z] of Object.entries(data)) {
-					zawodnicyMap.set(id, z);
-					if (z.nr_startowy) zawodnicyMap.set(z.nr_startowy, z);
-				}
-			}
-		}
+    const snapshot = await database.ref('zawodnicy').once('value');
+    const data = snapshot.val();
+    if (data) {
+        zawodnicyMap.clear();
+        for (const [id, z] of Object.entries(data)) {
+            // Jeśli brak pelna_kategoria a jest plec i rocznik - przelicz
+            if (!z.pelna_kategoria && z.plec && z.rocznik) {
+                z.pelna_kategoria = getPelnaKategoria(z.plec, z.rocznik);
+            }
+            zawodnicyMap.set(id, z);
+            if (z.nr_startowy) zawodnicyMap.set(z.nr_startowy, z);
+        }
+    }
+}
 
 	function obliczCzasBiegu(czasStartuStr, czasNaMecieStr) {
     if (!czasStartuStr || !czasNaMecieStr) return { formatted: '', seconds: null };
@@ -942,42 +1040,352 @@ function updateStatusCell(statusCell, liczba, limit) {
 
 function renderZawodnicyTable(container) {
     const columns = [
-        { key: 'id', label: 'ID' },
-        { key: 'imie', label: 'Imię' },
-        { key: 'nazwisko', label: 'Nazwisko' },
-        { key: 'rocznik', label: 'Rocznik' },
-        { key: 'pelna_kategoria', label: 'Kategoria' },
-        { key: 'konkurencja1', label: 'Konkurencja 1' },
-        { key: 'konkurencja2', label: 'Konkurencja 2' },
-        { key: 'nr_startowy', label: 'Nr startowy' },
-        { key: 'pakiet_odebrany', label: 'Pakiet' },
-        { key: 'plec', label: 'Płeć' },
-        { key: 'rezygnacja', label: 'Rezygnacja' },
-        { key: 'email', label: 'Email' }
+        { key: 'id', label: 'ID', editable: false },
+        { key: 'imie', label: 'Imię', editable: true, type: 'text' },
+        { key: 'nazwisko', label: 'Nazwisko', editable: true, type: 'text' },
+        { key: 'rocznik', label: 'Rocznik', editable: true, type: 'number' },
+        { key: 'plec', label: 'Płeć', editable: true, type: 'select', options: ['', 'K', 'M'] },
+        { key: 'pelna_kategoria', label: 'Kategoria', editable: false },
+        { key: 'konkurencja1', label: 'Konkurencja 1', editable: true, type: 'select', options: getUniqueKonkurencje() },
+        { key: 'konkurencja2', label: 'Konkurencja 2', editable: true, type: 'select', options: getUniqueKonkurencje() },
+        { key: 'nr_startowy', label: 'Nr startowy', editable: true, type: 'number' },
+        { key: 'pakiet_odebrany', label: 'Pakiet', editable: true, type: 'select', options: ['NIE', 'TAK'] },
+        { key: 'rezygnacja', label: 'Rezygnacja', editable: true, type: 'select', options: ['FALSE', 'TRUE'] },
+        { key: 'email', label: 'Email', editable: true, type: 'text' }
     ];
     
-    let html = '<div style="overflow-x: auto; max-height: 500px; margin-top: 20px; border-top: 2px solid #ddd; padding-top: 20px;">';
-    html += '<h4 style="margin: 10px 0;">📋 Lista zawodników</h4>';
-    html += '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">';
-    html += '<thead><tr style="background: #0a0f2c; color: white; position: sticky; top: 0;">';
+    // Pobierz wszystkie unikalne konkurencje z mapowania
+    function getUniqueKonkurencje() {
+        const konkurencje = new Set();
+        // Dodaj puste
+        konkurencje.add('');
+        // Z mapowania
+        for (const [key, value] of Object.entries(mapowanieKonkurencji || {})) {
+            konkurencje.add(value);
+        }
+        // Z zawodników
+        if (cachedZawodnicy) {
+            for (const z of cachedZawodnicy) {
+                if (z.konkurencja1) konkurencje.add(z.konkurencja1);
+                if (z.konkurencja2) konkurencje.add(z.konkurencja2);
+            }
+        }
+        return Array.from(konkurencje).sort();
+    }
+    
+     let html = `
+    <div style="overflow-x: auto; overflow-y: auto; max-height: 600px; margin-top: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+            <h4 style="margin: 0; font-size: 0.9rem;">📋 Lista zawodników (${cachedZawodnicy ? cachedZawodnicy.length : 0})</h4>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button id="saveAllEditsBtn" class="success" style="padding: 4px 12px; font-size: 0.75rem;">💾 Zapisz wszystkie zmiany</button>
+                <button id="refreshZawodnicyBtn" class="info" style="padding: 4px 12px; font-size: 0.75rem;">🔄 Odśwież</button>
+            </div>
+        </div>
+        <div style="font-size: 0.65rem; color: #666; margin-bottom: 8px;">
+            <span style="background: #fff3cd; padding: 2px 8px; border-radius: 4px;">🟡 Żółte pole = zmieniono</span>
+            <span style="background: #d4edda; padding: 2px 8px; border-radius: 4px; margin-left: 10px;">🟢 Zielone = zapisano</span>
+        </div>
+        <div style="overflow-x: auto; overflow-y: auto; max-height: 500px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 900px;">
+            <thead>
+                <tr style="background: #0a0f2c; color: white; position: sticky; top: 0; z-index: 10;">
+    `;
+    
     columns.forEach(col => {
-        html += `<th style="padding: 10px; border: 1px solid #ddd;">${col.label}</th>`;
+        html += `<th style="padding: 4px 6px; border: 1px solid #ddd; text-align: left; white-space: nowrap;">${col.label}</th>`;
     });
-    html += '</tr></thead><tbody>';
+    html += `<th style="padding: 4px 6px; border: 1px solid #ddd; text-align: center; white-space: nowrap;">Akcje</th>`;
+    html += `</tr></thead><tbody>`;
     
-    cachedZawodnicy.forEach((z, idx) => {
-        const rowBg = idx % 2 === 0 ? '#f9f9f9' : 'white';
-        html += `<tr style="background: ${rowBg};">`;
-        columns.forEach(col => {
-            let value = z[col.key] !== undefined && z[col.key] !== null ? z[col.key] : '';
-            html += `<td style="padding: 8px; border: 1px solid #ddd;">${value}</td>`;
+    if (!cachedZawodnicy || cachedZawodnicy.length === 0) {
+        html += `<tr><td colspan="${columns.length + 1}" style="text-align:center; padding: 20px; color: #666;">📭 Brak zawodników</td></tr>`;
+    } else {
+        cachedZawodnicy.forEach((z, idx) => {
+            const rowBg = idx % 2 === 0 ? '#f9f9f9' : 'white';
+            html += `<tr style="background: ${rowBg};" data-id="${z.id}">`;
+            
+            columns.forEach(col => {
+                let value = z[col.key] !== undefined && z[col.key] !== null ? z[col.key] : '';
+                
+                if (col.editable) {
+                    if (col.type === 'select') {
+                        const options = col.options || [];
+                        html += `<td style="padding: 2px 4px; border: 1px solid #ddd;">`;
+                        html += `<select class="edit-select" data-id="${z.id}" data-field="${col.key}" style="width: 100%; padding: 2px 4px; font-size: 0.7rem; border: 1px solid #ddd; border-radius: 3px; background: white;">`;
+                        options.forEach(opt => {
+                            const selected = value === opt ? 'selected' : '';
+                            html += `<option value="${opt}" ${selected}>${opt || '--'}</option>`;
+                        });
+                        html += `</select>`;
+                        html += `</td>`;
+                    } else {
+                        const inputType = col.type === 'number' ? 'number' : 'text';
+                        html += `<td style="padding: 2px 4px; border: 1px solid #ddd;">`;
+                        html += `<input type="${inputType}" class="edit-input" data-id="${z.id}" data-field="${col.key}" value="${value}" style="width: 100%; padding: 2px 4px; font-size: 0.7rem; border: 1px solid #ddd; border-radius: 3px;">`;
+                        html += `</td>`;
+                    }
+                } else {
+                    html += `<td style="padding: 4px 6px; border: 1px solid #ddd; font-size: 0.7rem;">${value}</td>`;
+                }
+            });
+            
+            html += `<td style="padding: 2px 4px; border: 1px solid #ddd; text-align: center;">
+                <button class="save-row-btn" data-id="${z.id}" style="padding: 2px 8px; font-size: 0.6rem; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">💾</button>
+                <button class="delete-row-btn" data-id="${z.id}" style="padding: 2px 8px; font-size: 0.6rem; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">🗑️</button>
+            </td>`;
+            html += `</tr>`;
         });
-        html += '</tr>';
+    }
+    
+    html += `
+        </tbody></table>
+        </div>
+        <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button id="addZawodnikBtn" class="success" style="padding: 4px 14px; font-size: 0.8rem;">➕ Dodaj zawodnika</button>
+        </div>
+    </div>`;
+    
+    container.innerHTML = html;
+    
+    // ============================================================
+    // OBSŁUGA ZMIAN - oznaczenie zmienionych pól na żółto
+    // ============================================================
+    document.querySelectorAll('.edit-input, .edit-select').forEach(el => {
+        const originalValue = el.value;
+        el.dataset.original = originalValue;
+        
+        el.addEventListener('change', function() {
+            if (this.value !== this.dataset.original) {
+                this.style.background = '#fff3cd';
+                this.style.borderColor = '#ffc107';
+            } else {
+                this.style.background = 'white';
+                this.style.borderColor = '#ddd';
+            }
+        });
     });
     
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
+    // ============================================================
+    // ZAPIS POJEDYNCZEGO WIERSZA
+    // ============================================================
+    document.querySelectorAll('.save-row-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const id = this.getAttribute('data-id');
+            await saveZawodnik(id);
+        });
+    });
+    
+    // ============================================================
+    // USUNIĘCIE ZAWODNIKA
+    // ============================================================
+    document.querySelectorAll('.delete-row-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const id = this.getAttribute('data-id');
+            if (confirm(`Czy na pewno chcesz usunąć zawodnika ${id}?`)) {
+                try {
+                    await database.ref(`zawodnicy/${id}`).remove();
+                    addLog(`🗑️ Usunięto zawodnika ${id}`, 'success');
+                    refreshPreviewData();
+                } catch (err) {
+                    addLog(`❌ Błąd usuwania: ${err.message}`, 'error');
+                }
+            }
+        });
+    });
+    
+    // ============================================================
+    // ZAPIS WSZYSTKICH ZMIAN
+    // ============================================================
+    document.getElementById('saveAllEditsBtn')?.addEventListener('click', async function() {
+        const ids = new Set();
+        document.querySelectorAll('.edit-input, .edit-select').forEach(el => {
+            ids.add(el.getAttribute('data-id'));
+        });
+        
+        let saved = 0;
+        let errors = 0;
+        
+        for (const id of ids) {
+            try {
+                await saveZawodnik(id);
+                saved++;
+            } catch (err) {
+                errors++;
+                addLog(`❌ Błąd zapisu ${id}: ${err.message}`, 'error');
+            }
+        }
+        
+        if (errors === 0) {
+            addLog(`✅ Zapisano ${saved} zawodników`, 'success');
+        } else {
+            addLog(`⚠️ Zapisano ${saved}, błędy: ${errors}`, 'warning');
+        }
+    });
+    
+    // ============================================================
+    // DODANIE NOWEGO ZAWODNIKA
+    // ============================================================
+    document.getElementById('addZawodnikBtn')?.addEventListener('click', function() {
+        const newId = `zaw_${Date.now()}`;
+        const newZawodnik = {
+            id: newId,
+            imie: '',
+            nazwisko: '',
+            rocznik: '',
+            plec: '',
+            pelna_kategoria: '',
+            konkurencja1: '',
+            konkurencja2: '',
+            nr_startowy: '',
+            pakiet_odebrany: 'NIE',
+            rezygnacja: 'FALSE',
+            email: ''
+        };
+        
+        // Dodaj do listy
+        if (!cachedZawodnicy) cachedZawodnicy = [];
+        cachedZawodnicy.push(newZawodnik);
+        
+        // Zapisz do Firebase
+        database.ref(`zawodnicy/${newId}`).set(newZawodnik)
+            .then(() => {
+                addLog(`✅ Dodano nowego zawodnika`, 'success');
+                refreshPreviewData();
+            })
+            .catch(err => {
+                addLog(`❌ Błąd dodawania: ${err.message}`, 'error');
+                refreshPreviewData();
+            });
+    });
+    
+    // ============================================================
+    // FUNKCJA ZAPISU POJEDYNCZEGO ZAWODNIKA
+    // ============================================================
+    async function saveZawodnik(id) {
+    const fields = {};
+    let plecZmieniona = false;
+    let rocznikZmieniony = false;
+    let nowaPlec = '';
+    let nowyRocznik = '';
+    
+    // Pobierz wszystkie pola edytowalne dla tego ID
+    document.querySelectorAll(`.edit-input[data-id="${id}"], .edit-select[data-id="${id}"]`).forEach(el => {
+        const field = el.getAttribute('data-field');
+        const value = el.value;
+        
+        // Konwertuj typy
+        if (field === 'rocznik' || field === 'nr_startowy') {
+            const numValue = value ? parseInt(value) : '';
+            fields[field] = numValue;
+            if (field === 'rocznik') {
+                rocznikZmieniony = true;
+                nowyRocznik = numValue;
+            }
+        } else if (field === 'plec') {
+            nowaPlec = value;
+            plecZmieniona = true;
+            fields[field] = value;
+        } else if (field === 'pakiet_odebrany' || field === 'rezygnacja') {
+            fields[field] = value;
+        } else {
+            fields[field] = value;
+        }
+        
+        // Resetuj styl
+        el.style.background = '#d4edda';
+        el.style.borderColor = '#28a745';
+        el.dataset.original = value;
+        
+        // Przywróć biały po chwili
+        setTimeout(() => {
+            el.style.background = 'white';
+            el.style.borderColor = '#ddd';
+        }, 1500);
+    });
+    
+    // ============================================================
+    // SPRAWDŹ CZY TRZEBA PRZELICZYĆ KATEGORIĘ
+    // ============================================================
+    // Pobierz aktualne dane zawodnika
+    const snapshot = await database.ref(`zawodnicy/${id}`).once('value');
+    const obecnyZawodnik = snapshot.val() || {};
+    
+    // Użyj nowych danych jeśli zmienione, lub obecnych jeśli nie
+    const uzytaPlec = plecZmieniona ? nowaPlec : (obecnyZawodnik.plec || '');
+    const uzytyRocznik = rocznikZmieniony ? nowyRocznik : (obecnyZawodnik.rocznik || '');
+    
+    // Jeśli mamy zarówno płeć jak i rocznik, przelicz kategorię
+    if (uzytaPlec && uzytyRocznik) {
+        const nowaKategoria = getPelnaKategoria(uzytaPlec, uzytyRocznik);
+        if (nowaKategoria && nowaKategoria !== obecnyZawodnik.pelna_kategoria) {
+            fields['pelna_kategoria'] = nowaKategoria;
+            // Zaktualizuj też kategoria_wiekowa jeśli potrzebna
+            const kategoriaWiekowa = getKategoriaZRocznika(uzytyRocznik);
+            if (kategoriaWiekowa) {
+                fields['kategoria_wiekowa'] = kategoriaWiekowa;
+            }
+            addLog(`🔄 Przeliczono kategorię na: ${nowaKategoria} (${uzytaPlec} ${kategoriaWiekowa || ''})`, 'success');
+        }
+    }
+    
+    // Jeśli zmieniono tylko płeć, ale mamy rocznik z bazy
+    if (plecZmieniona && !rocznikZmieniony && uzytyRocznik) {
+        const nowaKategoria = getPelnaKategoria(uzytaPlec, uzytyRocznik);
+        if (nowaKategoria && nowaKategoria !== obecnyZawodnik.pelna_kategoria) {
+            fields['pelna_kategoria'] = nowaKategoria;
+            const kategoriaWiekowa = getKategoriaZRocznika(uzytyRocznik);
+            if (kategoriaWiekowa) {
+                fields['kategoria_wiekowa'] = kategoriaWiekowa;
+            }
+            addLog(`🔄 Przeliczono kategorię na: ${nowaKategoria} (${uzytaPlec} ${kategoriaWiekowa || ''})`, 'success');
+        }
+    }
+    
+    // Jeśli zmieniono tylko rocznik, ale mamy płeć z bazy
+    if (rocznikZmieniony && !plecZmieniona && uzytaPlec) {
+        const nowaKategoria = getPelnaKategoria(uzytaPlec, uzytyRocznik);
+        if (nowaKategoria && nowaKategoria !== obecnyZawodnik.pelna_kategoria) {
+            fields['pelna_kategoria'] = nowaKategoria;
+            const kategoriaWiekowa = getKategoriaZRocznika(uzytyRocznik);
+            if (kategoriaWiekowa) {
+                fields['kategoria_wiekowa'] = kategoriaWiekowa;
+            }
+            addLog(`🔄 Przeliczono kategorię na: ${nowaKategoria} (${uzytaPlec} ${kategoriaWiekowa || ''})`, 'success');
+        }
+    }
+    
+    // Jeśli nie ma pól do zapisu
+    if (Object.keys(fields).length === 0) {
+        addLog(`⚠️ Brak zmian do zapisu dla ${id}`, 'warning');
+        return;
+    }
+    
+    try {
+        await database.ref(`zawodnicy/${id}`).update(fields);
+        addLog(`✅ Zapisano zmiany dla ${id}`, 'success');
+        
+        // Aktualizuj lokalną pamięć
+        const index = cachedZawodnicy.findIndex(z => z.id === id);
+        if (index !== -1) {
+            for (const [key, value] of Object.entries(fields)) {
+                cachedZawodnicy[index][key] = value;
+            }
+        }
+        
+        // Odśwież listę, aby pokazać nową kategorię
+        setTimeout(() => {
+            refreshPreviewData();
+        }, 500);
+        
+    } catch (err) {
+        addLog(`❌ Błąd zapisu ${id}: ${err.message}`, 'error');
+        throw err;
+    }
 }
+
+}
+		
 		// ==================== 5. GENEROWANIE KODÓW QR ====================
 		function showQRCodeView(panel) {
 			panel.innerHTML = `<div class="card"><h3>🔲 Generowanie kodów QR</h3><div class="instruction-box"><strong>📌 Instrukcja:</strong><br>Program do generowania kodów QR znajduje się pod ścieżką:<br><div class="file-path">D:\\_BIEGI_2026_\\Program\\QR_code\\dist\\QR_Generator.exe</div></div><button id="openQrFolderBtn">📂 Otwórz folder z programem</button></div>`;
